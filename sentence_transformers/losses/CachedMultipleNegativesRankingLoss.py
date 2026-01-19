@@ -259,9 +259,7 @@ class CachedMultipleNegativesRankingLoss(nn.Module):
             return None
         return torch.cat(list(cache), dim=0).to(device)
 
-    def _collect_cont_cache(
-        self, reps: list[list[Tensor]]
-    ) -> tuple[Tensor | None, list[Tensor | None] | None]:
+    def _collect_cont_cache(self, reps: list[list[Tensor]]) -> tuple[Tensor | None, list[Tensor | None] | None]:
         if not self.use_cont_accum or not self.training:
             return None, None
         self._init_cont_caches(num_candidate_columns=len(reps) - 1)
