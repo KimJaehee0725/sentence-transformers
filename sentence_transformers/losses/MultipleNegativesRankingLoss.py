@@ -87,6 +87,16 @@ class MultipleNegativesRankingLoss(nn.Module):
                 so that past anchors can still contribute gradients to current candidates. This option currently supports
                 only the default ``directions=("query_to_doc",)``.
 
+        References:
+            - Efficient Natural Language Response Suggestion for Smart Reply, Section 4.4: https://huggingface.co/papers/1705.00652
+            - A Gradient Accumulation Method for Dense Retriever under Memory Constraint: https://arxiv.org/abs/2406.12356
+            - `Training Examples > Natural Language Inference <../../../examples/sentence_transformer/training/nli/README.html>`_
+            - `Training Examples > Paraphrase Data <../../../examples/sentence_transformer/training/paraphrases/README.html>`_
+            - `Training Examples > Quora Duplicate Questions <../../../examples/sentence_transformer/training/quora_duplicate_questions/README.html>`_
+            - `Training Examples > MS MARCO <../../../examples/sentence_transformer/training/ms_marco/README.html>`_
+            - `Unsupervised Learning > SimCSE <../../../examples/sentence_transformer/unsupervised_learning/SimCSE/README.html>`_
+            - `Unsupervised Learning > GenQ <../../../examples/sentence_transformer/unsupervised_learning/query_generation/README.html>`_
+
         Requirements:
             1. (anchor, positive) pairs, (anchor, positive, negative) triplets, or (anchor, positive, negative_1, ..., negative_n) n-tuples
 
@@ -418,5 +428,13 @@ class MultipleNegativesRankingLoss(nn.Module):
       archivePrefix={arXiv},
       primaryClass={cs.LG},
       url={https://arxiv.org/abs/1807.03748},
+}
+@misc{kim2024gradient,
+    title={A Gradient Accumulation Method for Dense Retriever under Memory Constraint},
+    author={Sungdong Kim and Hwanhee Lee and Myeongho Jeong and Hoyeon Kim and Minbeom Lee and Kang Min Yoo and Taesup Moon},
+    year={2024},
+    eprint={2406.12356},
+    archivePrefix={arXiv},
+    primaryClass={cs.CL}
 }
 """

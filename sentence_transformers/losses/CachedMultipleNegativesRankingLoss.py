@@ -142,6 +142,7 @@ class CachedMultipleNegativesRankingLoss(nn.Module):
         References:
             - Efficient Natural Language Response Suggestion for Smart Reply, Section 4.4: https://huggingface.co/papers/1705.00652
             - Scaling Deep Contrastive Learning Batch Size under Memory Limited Setup: https://huggingface.co/papers/2101.06983
+            - A Gradient Accumulation Method for Dense Retriever under Memory Constraint: https://arxiv.org/abs/2406.12356
 
         Requirements:
             1. (anchor, positive) pairs, (anchor, positive, negative) triplets, or (anchor, positive, negative_1, ..., negative_n) n-tuples
@@ -547,5 +548,13 @@ class CachedMultipleNegativesRankingLoss(nn.Module):
     eprint={2101.06983},
     archivePrefix={arXiv},
     primaryClass={cs.LG}
+}
+@misc{kim2024gradient,
+    title={A Gradient Accumulation Method for Dense Retriever under Memory Constraint},
+    author={Sungdong Kim and Hwanhee Lee and Myeongho Jeong and Hoyeon Kim and Minbeom Lee and Kang Min Yoo and Taesup Moon},
+    year={2024},
+    eprint={2406.12356},
+    archivePrefix={arXiv},
+    primaryClass={cs.CL}
 }
 """
