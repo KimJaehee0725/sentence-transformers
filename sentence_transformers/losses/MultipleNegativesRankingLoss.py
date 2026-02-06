@@ -58,6 +58,7 @@ class MultipleNegativesRankingLoss(nn.Module):
 
         References:
             - Efficient Natural Language Response Suggestion for Smart Reply, Section 4.4: https://huggingface.co/papers/1705.00652
+            - A Gradient Accumulation Method for Dense Retriever under Memory Constraint: https://arxiv.org/abs/2406.12356
             - `Training Examples > Natural Language Inference <../../../examples/sentence_transformer/training/nli/README.html>`_
             - `Training Examples > Paraphrase Data <../../../examples/sentence_transformer/training/paraphrases/README.html>`_
             - `Training Examples > Quora Duplicate Questions <../../../examples/sentence_transformer/training/quora_duplicate_questions/README.html>`_
@@ -262,6 +263,14 @@ class MultipleNegativesRankingLoss(nn.Module):
     author={Matthew Henderson and Rami Al-Rfou and Brian Strope and Yun-hsuan Sung and Laszlo Lukacs and Ruiqi Guo and Sanjiv Kumar and Balint Miklos and Ray Kurzweil},
     year={2017},
     eprint={1705.00652},
+    archivePrefix={arXiv},
+    primaryClass={cs.CL}
+}
+@misc{kim2024gradient,
+    title={A Gradient Accumulation Method for Dense Retriever under Memory Constraint},
+    author={Sungdong Kim and Hwanhee Lee and Myeongho Jeong and Hoyeon Kim and Minbeom Lee and Kang Min Yoo and Taesup Moon},
+    year={2024},
+    eprint={2406.12356},
     archivePrefix={arXiv},
     primaryClass={cs.CL}
 }
