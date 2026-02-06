@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+import torch
+
 from sentence_transformers import InputExample, losses
 from sentence_transformers.util import batch_to_device
 
@@ -73,3 +76,60 @@ def test_cached_mnrl_bank_includes_all_candidates_for_triplets(stsb_bert_tiny_mo
     # For triplets, candidates include positive and negative: 2 * batch_size rows.
     assert loss._candidate_bank[0].shape[0] == 2 * batch_size
     assert loss._anchor_bank[0].shape[0] == batch_size
+
+
+def test_cached_mnrl_bank_supports_bidirectional(stsb_bert_tiny_model):
+    model = stsb_bert_tiny_model
+    model.to("cpu")
+    loss = losses.CachedMultipleNegativesRankingLoss(
+        model,
+        mini_batch_size=2,
+        bank_size=1,
+        directions=("query_to_doc", "doc_to_query"),
+        partition_mode="per_direction",
+    )
+    loss.train()
+
+    features, labels = model.smart_batching_collate(_pair_batch())
+    features = [batch_to_device(feature, model.device) for feature in features]
+    if labels is not None:
+        labels = labels.to(model.device)
+
+    loss_value = loss(features, labels)
+    assert torch.isfinite(loss_value)
+    assert loss._candidate_bank is not None
+    assert loss._anchor_bank is not None
+    assert len(loss._candidate_bank) == 1
+    assert len(loss._anchor_bank) == 1
+
+
+def test_cached_mnrl_bank_rejects_unsupported_direction_sets(stsb_bert_tiny_model):
+    model = stsb_bert_tiny_model
+    with pytest.raises(ValueError, match="bank_size supports only"):
+        losses.CachedMultipleNegativesRankingLoss(
+            model,
+            bank_size=1,
+            directions=("query_to_doc", "query_to_query"),
+        )
+
+
+def test_cached_mnrl_bank_supports_bidirectional_with_gather(stsb_bert_tiny_model):
+    model = stsb_bert_tiny_model
+    model.to("cpu")
+    loss = losses.CachedMultipleNegativesRankingLoss(
+        model,
+        mini_batch_size=2,
+        bank_size=1,
+        directions=("query_to_doc", "doc_to_query"),
+        partition_mode="per_direction",
+        gather_across_devices=True,
+    )
+    loss.train()
+
+    features, labels = model.smart_batching_collate(_pair_batch())
+    features = [batch_to_device(feature, model.device) for feature in features]
+    if labels is not None:
+        labels = labels.to(model.device)
+
+    loss_value = loss(features, labels)
+    assert torch.isfinite(loss_value)

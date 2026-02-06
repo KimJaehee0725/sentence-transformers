@@ -135,8 +135,9 @@ class CachedMultipleNegativesRankingLoss(nn.Module):
                 - "per_direction": One softmax per direction. A loss is computed for each direction and then averaged.
             bank_size: Number of previous update steps to use as additional in-batch negatives. If 0, the memory bank
                 is disabled. When enabled, the bank caches both anchors and candidates and reuses them in future steps
-                so that past anchors can still contribute gradients to current candidates. This option currently supports
-                only the default ``directions=("query_to_doc",)``.
+                so that past anchors can still contribute gradients to current candidates. Supported directions with
+                ``bank_size > 0`` are ``("query_to_doc",)`` and bidirectional
+                ``("query_to_doc", "doc_to_query")``.
             show_progress_bar: If True, a progress bar for the mini-batches is shown during training. The default is False.
 
         References:
@@ -224,8 +225,14 @@ class CachedMultipleNegativesRankingLoss(nn.Module):
 
         if bank_size < 0:
             raise ValueError("bank_size must be >= 0")
-        if bank_size > 0 and set(self.directions) != {"query_to_doc"}:
-            raise ValueError("bank_size currently supports only directions=('query_to_doc',).")
+        if bank_size > 0 and set(self.directions) not in (
+            {"query_to_doc"},
+            {"query_to_doc", "doc_to_query"},
+        ):
+            raise ValueError(
+                "bank_size supports only directions=('query_to_doc',) or "
+                "('query_to_doc', 'doc_to_query')."
+            )
 
     def _maybe_warn_bank_size(
         self,
@@ -373,10 +380,107 @@ class CachedMultipleNegativesRankingLoss(nn.Module):
 
         return sum(losses)
 
+    def _calculate_bidirectional_loss_with_bank(self, reps: list[list[Tensor]], with_backward: bool = False) -> Tensor:
+        anchors = torch.cat(reps[0])  # (batch_size, embedding_dim)
+        candidate_columns = [torch.cat(r) for r in reps[1:]]
+        batch_size = anchors.size(0)
+        offset = 0
+
+        docs_pos = candidate_columns[0]
+        query_columns = anchors
+        if self.gather_across_devices:
+            candidate_columns = [all_gather_with_grad(embedding_column) for embedding_column in candidate_columns]
+            query_columns = all_gather_with_grad(anchors)
+            if torch.distributed.is_initialized():
+                rank = torch.distributed.get_rank()
+                offset = rank * batch_size
+
+        candidates = torch.cat(candidate_columns, dim=0)
+        current_candidates_len = candidates.size(0)
+        current_query_columns_len = query_columns.size(0)
+
+        total_candidates = candidates
+        total_query_columns = query_columns
+        total_anchor_rows = anchors
+        total_docs_pos = docs_pos
+        query_to_doc_labels = [torch.arange(offset, offset + batch_size, device=anchors.device)]
+        doc_to_query_labels = [torch.arange(offset, offset + batch_size, device=anchors.device)]
+
+        if self._candidate_bank:
+            bank_candidates_list = list(self._candidate_bank)
+            bank_anchors_list = list(self._anchor_bank)
+
+            bank_candidates = torch.cat(bank_candidates_list, dim=0)
+            total_candidates = torch.cat([total_candidates, bank_candidates], dim=0)
+
+            bank_anchors = torch.cat(bank_anchors_list, dim=0)
+            total_query_columns = torch.cat([total_query_columns, bank_anchors], dim=0)
+            total_anchor_rows = torch.cat([total_anchor_rows, bank_anchors], dim=0)
+
+            bank_positive_docs = []
+            bank_query_labels = []
+            bank_doc_labels = []
+            bank_candidate_offset = current_candidates_len
+            bank_anchor_offset = current_query_columns_len
+            for step_anchors, step_candidates in zip(bank_anchors_list, bank_candidates_list):
+                step_size = step_anchors.size(0)
+                bank_positive_docs.append(step_candidates[:step_size])
+                bank_query_labels.append(
+                    torch.arange(bank_candidate_offset, bank_candidate_offset + step_size, device=anchors.device)
+                )
+                bank_doc_labels.append(
+                    torch.arange(bank_anchor_offset, bank_anchor_offset + step_size, device=anchors.device)
+                )
+                bank_candidate_offset += step_candidates.size(0)
+                bank_anchor_offset += step_size
+
+            total_docs_pos = torch.cat([total_docs_pos, torch.cat(bank_positive_docs, dim=0)], dim=0)
+            query_to_doc_labels.append(torch.cat(bank_query_labels, dim=0))
+            doc_to_query_labels.append(torch.cat(bank_doc_labels, dim=0))
+
+        query_to_doc_labels = torch.cat(query_to_doc_labels, dim=0)
+        doc_to_query_labels = torch.cat(doc_to_query_labels, dim=0)
+        total_rows = total_anchor_rows.size(0)
+
+        losses: list[torch.Tensor] = []
+        for begin in tqdm.trange(
+            0,
+            total_rows,
+            self.mini_batch_size,
+            desc="Calculating loss",
+            disable=not self.show_progress_bar,
+        ):
+            end = min(begin + self.mini_batch_size, total_rows)
+            rows = end - begin
+            row_indices = torch.arange(rows, device=anchors.device)
+
+            scores_query_to_doc = self.similarity_fct(total_anchor_rows[begin:end], total_candidates) * self.scale
+            scores_doc_to_query = self.similarity_fct(total_docs_pos[begin:end], total_query_columns) * self.scale
+
+            if self.partition_mode == "joint":
+                positive_scores = scores_query_to_doc[row_indices, query_to_doc_labels[begin:end]]
+                all_scores = torch.cat([scores_query_to_doc, scores_doc_to_query], dim=1)
+                loss_mbatch = -(positive_scores - torch.logsumexp(all_scores, dim=1)).mean()
+            else:
+                loss_query_to_doc = self.cross_entropy_loss(scores_query_to_doc, query_to_doc_labels[begin:end])
+                loss_doc_to_query = self.cross_entropy_loss(scores_doc_to_query, doc_to_query_labels[begin:end])
+                loss_mbatch = (loss_query_to_doc + loss_doc_to_query) / 2
+
+            loss_mbatch = loss_mbatch * rows / total_rows
+
+            if with_backward:
+                loss_mbatch.backward()
+                loss_mbatch = loss_mbatch.detach()
+            losses.append(loss_mbatch)
+
+        return sum(losses)
+
     def calculate_loss(self, reps: list[list[Tensor]], with_backward: bool = False) -> Tensor:
         """Calculate the all-pairs InfoNCE loss without caching gradients (for evaluation)."""
         if self.bank_size > 0:
-            return self._calculate_query_to_doc_loss_with_bank(reps, with_backward=with_backward)
+            if set(self.directions) == {"query_to_doc"}:
+                return self._calculate_query_to_doc_loss_with_bank(reps, with_backward=with_backward)
+            return self._calculate_bidirectional_loss_with_bank(reps, with_backward=with_backward)
         queries = torch.cat(reps[0])
         docs = [torch.cat(r) for r in reps[1:]]
         batch_size = len(queries)

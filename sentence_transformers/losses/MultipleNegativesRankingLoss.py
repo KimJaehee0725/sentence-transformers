@@ -84,8 +84,9 @@ class MultipleNegativesRankingLoss(nn.Module):
                 - "per_direction": One softmax per direction. A loss is computed for each direction and then averaged.
             bank_size: Number of previous update steps to use as additional in-batch negatives. If 0, the memory bank
                 is disabled. When enabled, the bank caches both anchors and candidates and reuses them in future steps
-                so that past anchors can still contribute gradients to current candidates. This option currently supports
-                only the default ``directions=("query_to_doc",)``.
+                so that past anchors can still contribute gradients to current candidates. Supported directions with
+                ``bank_size > 0`` are ``("query_to_doc",)`` and bidirectional
+                ``("query_to_doc", "doc_to_query")``.
 
         References:
             - Efficient Natural Language Response Suggestion for Smart Reply, Section 4.4: https://huggingface.co/papers/1705.00652
@@ -202,8 +203,14 @@ class MultipleNegativesRankingLoss(nn.Module):
 
         if bank_size < 0:
             raise ValueError("bank_size must be >= 0")
-        if bank_size > 0 and set(self.directions) != {"query_to_doc"}:
-            raise ValueError("bank_size currently supports only directions=('query_to_doc',).")
+        if bank_size > 0 and set(self.directions) not in (
+            {"query_to_doc"},
+            {"query_to_doc", "doc_to_query"},
+        ):
+            raise ValueError(
+                "bank_size supports only directions=('query_to_doc',) or "
+                "('query_to_doc', 'doc_to_query')."
+            )
 
     def _maybe_warn_bank_size(
         self,
@@ -281,6 +288,86 @@ class MultipleNegativesRankingLoss(nn.Module):
 
         return loss
 
+    def _compute_bidirectional_loss_with_bank(self, embeddings: list[Tensor]) -> Tensor:
+        anchors = embeddings[0]
+        candidate_columns = embeddings[1:]
+        batch_size = anchors.size(0)
+        offset = 0
+
+        docs_pos = candidate_columns[0]
+        query_columns = anchors
+        if self.gather_across_devices:
+            candidate_columns = [all_gather_with_grad(embedding_column) for embedding_column in candidate_columns]
+            query_columns = all_gather_with_grad(anchors)
+            if torch.distributed.is_initialized():
+                rank = torch.distributed.get_rank()
+                offset = rank * batch_size
+
+        candidates = torch.cat(candidate_columns, dim=0)
+        current_candidates_len = candidates.size(0)
+        current_query_columns_len = query_columns.size(0)
+
+        total_candidates = candidates
+        total_query_columns = query_columns
+        total_anchor_rows = anchors
+        total_docs_pos = docs_pos
+        query_to_doc_labels = [torch.arange(offset, offset + batch_size, device=anchors.device)]
+        doc_to_query_labels = [torch.arange(offset, offset + batch_size, device=anchors.device)]
+
+        if self._candidate_bank:
+            bank_candidates_list = list(self._candidate_bank)
+            bank_anchors_list = list(self._anchor_bank)
+
+            bank_candidates = torch.cat(bank_candidates_list, dim=0)
+            total_candidates = torch.cat([total_candidates, bank_candidates], dim=0)
+
+            bank_anchors = torch.cat(bank_anchors_list, dim=0)
+            total_query_columns = torch.cat([total_query_columns, bank_anchors], dim=0)
+            total_anchor_rows = torch.cat([total_anchor_rows, bank_anchors], dim=0)
+
+            bank_positive_docs = []
+            bank_query_labels = []
+            bank_doc_labels = []
+            bank_candidate_offset = current_candidates_len
+            bank_anchor_offset = current_query_columns_len
+            for step_anchors, step_candidates in zip(bank_anchors_list, bank_candidates_list):
+                step_size = step_anchors.size(0)
+                bank_positive_docs.append(step_candidates[:step_size])
+                bank_query_labels.append(
+                    torch.arange(bank_candidate_offset, bank_candidate_offset + step_size, device=anchors.device)
+                )
+                bank_doc_labels.append(
+                    torch.arange(bank_anchor_offset, bank_anchor_offset + step_size, device=anchors.device)
+                )
+                bank_candidate_offset += step_candidates.size(0)
+                bank_anchor_offset += step_size
+
+            total_docs_pos = torch.cat([total_docs_pos, torch.cat(bank_positive_docs, dim=0)], dim=0)
+            query_to_doc_labels.append(torch.cat(bank_query_labels, dim=0))
+            doc_to_query_labels.append(torch.cat(bank_doc_labels, dim=0))
+
+        query_to_doc_labels = torch.cat(query_to_doc_labels, dim=0)
+        doc_to_query_labels = torch.cat(doc_to_query_labels, dim=0)
+
+        scores_query_to_doc = self.similarity_fct(total_anchor_rows, total_candidates) * self.scale
+        scores_doc_to_query = self.similarity_fct(total_docs_pos, total_query_columns) * self.scale
+
+        if self.partition_mode == "joint":
+            row_indices = torch.arange(total_anchor_rows.size(0), device=anchors.device)
+            positive_scores = scores_query_to_doc[row_indices, query_to_doc_labels]
+            all_scores = torch.cat([scores_query_to_doc, scores_doc_to_query], dim=1)
+            log_z = torch.logsumexp(all_scores, dim=1)
+            loss = -(positive_scores - log_z).mean()
+        else:
+            loss_query_to_doc = self.cross_entropy_loss(scores_query_to_doc, query_to_doc_labels)
+            loss_doc_to_query = self.cross_entropy_loss(scores_doc_to_query, doc_to_query_labels)
+            loss = (loss_query_to_doc + loss_doc_to_query) / 2
+
+        if self.bank_size > 0 and self.training:
+            self._update_banks(embeddings[0], embeddings[1:])
+
+        return loss
+
     def _update_banks(self, anchors: Tensor, candidates: list[Tensor]) -> None:
         if self.bank_size <= 0:
             return
@@ -309,7 +396,9 @@ class MultipleNegativesRankingLoss(nn.Module):
             self._maybe_warn_bank_size(step_anchor_count, num_candidate_columns, world_size)
 
         if self.bank_size > 0:
-            return self._compute_query_to_doc_loss_with_bank(embeddings)
+            if set(self.directions) == {"query_to_doc"}:
+                return self._compute_query_to_doc_loss_with_bank(embeddings)
+            return self._compute_bidirectional_loss_with_bank(embeddings)
 
         queries = embeddings[0]
         docs = embeddings[1:]
