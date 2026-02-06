@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import nullcontext
 from functools import partial
 from typing import Any, Literal
 
+import logging
 import torch
 import tqdm
 from torch import Tensor, nn
@@ -14,6 +16,8 @@ from sentence_transformers import util
 from sentence_transformers.models import StaticEmbedding
 from sentence_transformers.SentenceTransformer import SentenceTransformer
 from sentence_transformers.util import all_gather_with_grad
+
+logger = logging.getLogger(__name__)
 
 
 class RandContext:
@@ -79,6 +83,7 @@ class CachedMultipleNegativesRankingLoss(nn.Module):
             ...,
         ] = ("query_to_doc",),
         partition_mode: Literal["joint", "per_direction"] = "joint",
+        bank_size: int = 0,
         show_progress_bar: bool = False,
     ) -> None:
         """
@@ -128,6 +133,10 @@ class CachedMultipleNegativesRankingLoss(nn.Module):
             partition_mode: How to normalize the scores (the softmax denominator):
                 - "joint": One joint softmax over all selected directions.
                 - "per_direction": One softmax per direction. A loss is computed for each direction and then averaged.
+            bank_size: Number of previous update steps to use as additional in-batch negatives. If 0, the memory bank
+                is disabled. When enabled, the bank caches both anchors and candidates and reuses them in future steps
+                so that past anchors can still contribute gradients to current candidates. This option currently supports
+                only the default ``directions=("query_to_doc",)``.
             show_progress_bar: If True, a progress bar for the mini-batches is shown during training. The default is False.
 
         References:
@@ -202,10 +211,47 @@ class CachedMultipleNegativesRankingLoss(nn.Module):
         if partition_mode not in ("joint", "per_direction"):
             raise ValueError(f"partition_mode must be 'joint' or 'per_direction', got {partition_mode}")
         self.partition_mode = partition_mode
+        self.bank_size = bank_size
         self.show_progress_bar = show_progress_bar
 
+        self.cross_entropy_loss = nn.CrossEntropyLoss()
         self.cache: list[list[Tensor]] | None = None
         self.random_states: list[list[RandContext]] | None = None
+        self._candidate_bank = deque(maxlen=bank_size) if bank_size > 0 else None
+        self._anchor_bank = deque(maxlen=bank_size) if bank_size > 0 else None
+        self._warned_bank_size = False
+
+        if bank_size < 0:
+            raise ValueError("bank_size must be >= 0")
+        if bank_size > 0 and set(self.directions) != {"query_to_doc"}:
+            raise ValueError("bank_size currently supports only directions=('query_to_doc',).")
+
+    def _maybe_warn_bank_size(
+        self,
+        step_anchor_count: int,
+        num_candidate_columns: int,
+        world_size: int,
+    ) -> None:
+        if self.bank_size <= 0 or self._warned_bank_size:
+            return
+        step_candidate_count = step_anchor_count * num_candidate_columns
+        max_bank_anchors = self.bank_size * step_anchor_count
+        max_bank_candidates = self.bank_size * step_candidate_count
+        logger.warning(
+            "CachedMultipleNegativesRankingLoss: bank_size=%d caches the last k forward passes (micro-batches). "
+            "Per step: anchors=%d, candidates=%d (candidate columns=%d, world_size=%d). "
+            "At full capacity, the bank holds up to %d anchors and %d candidates. "
+            "If you use gradient accumulation, bank_size counts micro-batches, not optimizer steps. "
+            "Adjust bank_size accordingly.",
+            self.bank_size,
+            step_anchor_count,
+            step_candidate_count,
+            num_candidate_columns,
+            world_size,
+            max_bank_anchors,
+            max_bank_candidates,
+        )
+        self._warned_bank_size = True
 
     def embed_minibatch(
         self,
@@ -268,8 +314,68 @@ class CachedMultipleNegativesRankingLoss(nn.Module):
 
         return loss
 
+    def _calculate_query_to_doc_loss_with_bank(self, reps: list[list[Tensor]], with_backward: bool = False) -> Tensor:
+        anchors = torch.cat(reps[0])  # (batch_size, embedding_dim)
+        candidates = [torch.cat(r) for r in reps[1:]]  # (1 + num_neg) tensors of shape (batch_size, embedding_dim)
+        batch_size = anchors.size(0)
+        offset = 0
+
+        if self.gather_across_devices:
+            # Gather only candidate columns, like classic InfoNCE.
+            candidates = [all_gather_with_grad(embedding_column) for embedding_column in candidates]
+            if torch.distributed.is_initialized():
+                rank = torch.distributed.get_rank()
+                offset = rank * batch_size
+
+        candidates = torch.cat(candidates, dim=0)
+        current_candidates_len = candidates.size(0)
+
+        total_candidates = candidates
+        total_anchors = anchors
+        total_labels = [torch.arange(offset, offset + batch_size, device=anchors.device)]
+
+        if self._candidate_bank:
+            bank_candidates = torch.cat(list(self._candidate_bank), dim=0)
+            total_candidates = torch.cat([total_candidates, bank_candidates], dim=0)
+
+            bank_anchors = torch.cat(list(self._anchor_bank), dim=0)
+            total_anchors = torch.cat([total_anchors, bank_anchors], dim=0)
+
+            bank_labels = []
+            bank_offset = current_candidates_len
+            for step_anchors, step_candidates in zip(self._anchor_bank, self._candidate_bank):
+                step_size = step_anchors.size(0)
+                bank_labels.append(torch.arange(bank_offset, bank_offset + step_size, device=anchors.device))
+                bank_offset += step_candidates.size(0)
+            total_labels.append(torch.cat(bank_labels, dim=0))
+
+        total_labels = torch.cat(total_labels, dim=0)
+        total_anchors_len = total_anchors.size(0)
+
+        losses: list[torch.Tensor] = []
+        for begin in tqdm.trange(
+            0,
+            total_anchors_len,
+            self.mini_batch_size,
+            desc="Calculating loss",
+            disable=not self.show_progress_bar,
+        ):
+            end = min(begin + self.mini_batch_size, total_anchors_len)
+            scores: Tensor = self.similarity_fct(total_anchors[begin:end], total_candidates) * self.scale
+            loss_mbatch: torch.Tensor = (
+                self.cross_entropy_loss(scores, total_labels[begin:end]) * len(scores) / total_anchors_len
+            )
+            if with_backward:
+                loss_mbatch.backward()
+                loss_mbatch = loss_mbatch.detach()
+            losses.append(loss_mbatch)
+
+        return sum(losses)
+
     def calculate_loss(self, reps: list[list[Tensor]], with_backward: bool = False) -> Tensor:
         """Calculate the all-pairs InfoNCE loss without caching gradients (for evaluation)."""
+        if self.bank_size > 0:
+            return self._calculate_query_to_doc_loss_with_bank(reps, with_backward=with_backward)
         queries = torch.cat(reps[0])
         docs = [torch.cat(r) for r in reps[1:]]
         batch_size = len(queries)
@@ -376,6 +482,13 @@ class CachedMultipleNegativesRankingLoss(nn.Module):
             reps.append(reps_mbs)
             self.random_states.append(random_state_mbs)
 
+        if self.training and torch.is_grad_enabled():
+            local_batch = sum(rep.size(0) for rep in reps[0])
+            num_candidate_columns = len(reps) - 1
+            world_size = torch.distributed.get_world_size() if torch.distributed.is_initialized() else 1
+            step_anchor_count = local_batch * world_size
+            self._maybe_warn_bank_size(step_anchor_count, num_candidate_columns, world_size)
+
         if torch.is_grad_enabled():
             # Step (2): Calculate the loss, backward up to the embeddings and cache the gradients wrt. to the embeddings
             loss = self.calculate_loss_and_cache_gradients(reps)
@@ -386,7 +499,28 @@ class CachedMultipleNegativesRankingLoss(nn.Module):
             # If grad is not enabled (e.g. in evaluation), then we don't have to worry about the gradients or backward hook
             loss = self.calculate_loss(reps)
 
+        if self.bank_size > 0 and self.training:
+            self._update_banks(reps)
+
         return loss
+
+    def _update_banks(self, reps: list[list[Tensor]]) -> None:
+        if self.bank_size <= 0:
+            return
+        anchors = torch.cat(reps[0])
+        candidates_columns = [torch.cat(r) for r in reps[1:]]
+        with torch.no_grad():
+            step_anchors = anchors.detach()
+            step_candidates_columns = [candidate.detach() for candidate in candidates_columns]
+            if torch.distributed.is_initialized():
+                step_anchors = util.all_gather(step_anchors, with_grad=False)
+                step_candidates_columns = [
+                    util.all_gather(step_candidates_column, with_grad=False)
+                    for step_candidates_column in step_candidates_columns
+                ]
+            step_candidates = torch.cat(step_candidates_columns, dim=0)
+            self._candidate_bank.append(step_candidates)
+            self._anchor_bank.append(step_anchors)
 
     def get_config_dict(self) -> dict[str, Any]:
         return {
@@ -396,6 +530,7 @@ class CachedMultipleNegativesRankingLoss(nn.Module):
             "gather_across_devices": self.gather_across_devices,
             "directions": self.directions,
             "partition_mode": self.partition_mode,
+            "bank_size": self.bank_size,
         }
 
     @property
