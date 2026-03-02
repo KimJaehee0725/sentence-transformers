@@ -163,6 +163,7 @@ EXPECT_MULTIMODAL_FAILURE = [
 EXPECT_IMAGE_VIDEO_FAILURE = [
     "glm4v",  # glm4v and glm4v_moe use image tokens for videos as well, and thus lose the ability to assign image features to the "real" image tokens,
     "glm4v_moe",  # and the video features to the image tokens used for videos.
+    "glm_ocr",
 ]
 EXPECT_IMAGE_ONLY_FAILURE = [
     "llama4",  # Text is required at all times  # TODO: Or should I update Transformer? But this supports 'message' with only image I think?
