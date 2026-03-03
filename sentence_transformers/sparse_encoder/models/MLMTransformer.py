@@ -9,11 +9,13 @@ logger = logging.getLogger(__name__)
 
 
 class MLMTransformer(Transformer):
+    default_transformer_task = "fill-mask"
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         logger.warning(
             "MLMTransformer is deprecated and will be removed in a future release. "
             "Please use sentence_transformers.sentence_transformer.models.Transformer with "
             '`transformer_task="fill-mask"` instead.'
         )
-        transformer_task = kwargs.pop("transformer_task", "fill-mask")
+        transformer_task = kwargs.pop("transformer_task", self.default_transformer_task)
         super().__init__(*args, transformer_task=transformer_task, **kwargs)

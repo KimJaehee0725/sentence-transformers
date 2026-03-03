@@ -259,6 +259,7 @@ class Transformer(InputModule):
         "message_format",
     ]  # , "max_seq_length", "do_lower_case"]
     save_in_root: bool = True
+    default_transformer_task: TransformerTask = "feature-extraction"
 
     # TODO: Replace model_args with model_kwargs, perhaps replace tokenizer_args with processing_kwargs/processor_kwargs, config_args with config_kwargs?
     # TODO: Perhaps remove do_lower_case and put that in tokenizer_args?
@@ -1472,6 +1473,18 @@ class Transformer(InputModule):
                 else:
                     deserialized_modality_config[modality_key] = params
             config["modality_config"] = deserialized_modality_config
+
+        else:
+            # This method is only called if this model has a modules.json, i.e. it's already been saved
+            # with Sentence Transformers. So, if modality_config is not in the config, we can assume it
+            # was saved with an older version where Transformer was text-only, and so we can set the
+            # modality_config accordingly for backward compatibility. Otherwise, we might infer and use
+            # the 'message' format and get different results than what previously worked.
+            modality_config, module_output_name = DEFAULT_MODALITY_CONFIG_MODULE_OUTPUT_NAME[
+                config.get("transformer_task", cls.default_transformer_task)
+            ]
+            config["modality_config"] = modality_config
+            config["module_output_name"] = module_output_name
 
         return config
 
