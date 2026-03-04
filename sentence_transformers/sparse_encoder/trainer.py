@@ -19,6 +19,7 @@ from transformers.utils.deprecation import deprecate_kwarg
 from sentence_transformers.base.models import Router
 from sentence_transformers.base.trainer import BaseTrainer
 from sentence_transformers.sentence_transformer.evaluation import SentenceEvaluator
+from sentence_transformers.sentence_transformer.models import Pooling
 from sentence_transformers.sparse_encoder.callbacks.splade_callbacks import SpladeRegularizerWeightSchedulerCallback
 from sentence_transformers.sparse_encoder.data_collator import SparseEncoderDataCollator
 from sentence_transformers.sparse_encoder.losses import SparseMultipleNegativesRankingLoss, SpladeLoss
@@ -154,6 +155,10 @@ class SparseEncoderTrainer(BaseTrainer):
         self.args: SparseEncoderTrainingArguments
         self.data_collator: SparseEncoderDataCollator
 
+        # Notify the data collator whether to include prompt lengths during batch preparation
+        if hasattr(self.data_collator, "include_prompt_lengths"):
+            self.data_collator.include_prompt_lengths = self._include_prompt_length()
+
     def get_default_loss(self, model: SparseEncoder) -> torch.nn.Module:
         logger.info(
             "No `loss` passed, using `sentence_transformers.sparse_encoder.losses.SpladeLoss` as a default option. with "
@@ -203,7 +208,15 @@ class SparseEncoderTrainer(BaseTrainer):
                 "e.g. {'column_one': 'query', 'column_two': 'document', 'column_three': 'document'}."
             )
 
-        return self.data_collator_class(tokenize_fn=model.preprocess, router_mapping=args.router_mapping)
+        all_special_ids = set()
+        if processing_class is not None and hasattr(processing_class, "all_special_ids"):
+            all_special_ids = set(processing_class.all_special_ids)
+        return self.data_collator_class(
+            tokenize_fn=model.preprocess,
+            router_mapping=args.router_mapping,
+            prompts=args.prompts,
+            all_special_ids=all_special_ids,
+        )
 
     def should_dataset_name_column_be_added(
         self,
@@ -215,17 +228,31 @@ class SparseEncoderTrainer(BaseTrainer):
         We should add a dataset name column to the dataset, if the dataset is a DatasetDict, *and* one of:
 
         a. The loss is a dictionary, or
-        b. The router_mapping contains a mapping of dataset names.
+        b. The prompts contain a mapping of dataset names, or
+        c. The router_mapping contains a mapping of dataset names.
         """
 
         return isinstance(dataset, (DatasetDict, IterableDatasetDict)) and (
             isinstance(loss, dict)
+            or (args.prompts and isinstance(args.prompts, dict))
             or (
                 args.router_mapping
                 and isinstance(args.router_mapping, dict)
                 and isinstance(next(iter(args.router_mapping.values())), dict)
             )
         )
+
+    def _include_prompt_length(self) -> bool:
+        """
+        Return whether the prompt length should be passed to the model's forward method.
+
+        True if the model does not include the prompt in the pooling layer. Can be
+        overridden by the user if it's useful to include the prompt length.
+        """
+        for module in self.model:
+            if isinstance(module, Pooling):
+                return not module.include_prompt
+        return False
 
     def prepare_loss(
         self,

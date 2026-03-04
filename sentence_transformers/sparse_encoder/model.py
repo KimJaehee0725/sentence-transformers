@@ -134,7 +134,6 @@ class SparseEncoder(BaseModel):
     model_card_data_class = SparseEncoderModelCardData
     default_huggingface_organization: str | None = "sparse-encoder"
 
-    # TODO: Prompts have been removed, let's warn if they're provided
     def __init__(
         self,
         model_name_or_path: str | None = None,
@@ -152,9 +151,20 @@ class SparseEncoder(BaseModel):
         model_card_data: SparseEncoderModelCardData | None = None,
         backend: Literal["torch", "onnx", "openvino"] = "torch",
         # SparseEncoder-specific args
+        prompts: dict[str, str] | None = None,
+        default_prompt_name: str | None = None,
         similarity_fn_name: str | SimilarityFunction | None = None,
         max_active_dims: int | None = None,
     ) -> None:
+        # Set default prompts for SparseEncoder
+        default_prompts = {"query": "", "document": ""}
+        if prompts:
+            default_prompts.update(prompts)
+        prompts = default_prompts
+
+        # SparseEncoder-specific attributes
+        self.prompts = prompts
+        self.default_prompt_name = default_prompt_name
         self.similarity_fn_name = similarity_fn_name
 
         super().__init__(
@@ -184,9 +194,30 @@ class SparseEncoder(BaseModel):
             else:
                 self.max_active_dims = max_active_dims
 
+        # Validate and log prompts
+        if self.default_prompt_name is not None and self.default_prompt_name not in self.prompts:
+            raise ValueError(
+                f"Default prompt name '{self.default_prompt_name}' not found in the configured prompts "
+                f"dictionary with keys {list(self.prompts.keys())!r}."
+            )
+
+        if self.prompts and (non_empty_keys := [k for k, v in self.prompts.items() if v != ""]):
+            if len(non_empty_keys) == 1:
+                logger.info(f"1 prompt is loaded, with the key: {non_empty_keys[0]}")
+            else:
+                logger.info(f"{len(non_empty_keys)} prompts are loaded, with the keys: {non_empty_keys}")
+        if self.default_prompt_name:
+            logger.warning(
+                f"Default prompt name is set to '{self.default_prompt_name}'. "
+                "This prompt will be applied to all `encode()` calls, except if `encode()` "
+                "is called with `prompt` or `prompt_name` parameters."
+            )
+
     def encode_query(
         self,
         sentences: list[StrInputs] | StrInputs,
+        prompt_name: str | None = None,
+        prompt: str | None = None,
         batch_size: int = 32,
         show_progress_bar: bool | None = None,
         convert_to_tensor: bool = True,
@@ -224,6 +255,13 @@ class SparseEncoder(BaseModel):
 
         Args:
             sentences (Union[str, List[str]]): The sentences to embed.
+            prompt_name (Optional[str], optional): The name of the prompt to use for encoding. Must be a key in the
+                ``prompts`` dictionary. If ``prompt`` is also set, this argument is ignored. If neither ``prompt_name``
+                nor ``prompt`` is set, uses the "query" prompt if available. Defaults to None.
+            prompt (Optional[str], optional): The prompt to use for encoding. For example, if the prompt is
+                "query: ", then the sentence "What is the capital of France?" will be encoded as
+                "query: What is the capital of France?". If ``prompt`` is set, ``prompt_name`` is ignored.
+                Defaults to None.
             batch_size (int, optional): The batch size used for the computation. Defaults to 32.
             show_progress_bar (bool, optional): Whether to output a progress bar when encode sentences. Defaults to None.
             convert_to_tensor (bool, optional): Whether the output should be a single stacked tensor (True) or a list
@@ -273,8 +311,13 @@ class SparseEncoder(BaseModel):
                 print(embeddings.shape)
                 # (3, 30522)
         """
+        if prompt_name is None and "query" in self.prompts and prompt is None:
+            prompt_name = "query"
+
         return self.encode(
             sentences=sentences,
+            prompt_name=prompt_name,
+            prompt=prompt,
             batch_size=batch_size,
             show_progress_bar=show_progress_bar,
             convert_to_tensor=convert_to_tensor,
@@ -291,6 +334,8 @@ class SparseEncoder(BaseModel):
     def encode_document(
         self,
         sentences: list[StrInputs] | StrInputs,
+        prompt_name: str | None = None,
+        prompt: str | None = None,
         batch_size: int = 32,
         show_progress_bar: bool | None = None,
         convert_to_tensor: bool = True,
@@ -328,6 +373,14 @@ class SparseEncoder(BaseModel):
 
         Args:
             sentences (Union[str, List[str]]): The sentences to embed.
+            prompt_name (Optional[str], optional): The name of the prompt to use for encoding. Must be a key in the
+                ``prompts`` dictionary. If ``prompt`` is also set, this argument is ignored. If neither ``prompt_name``
+                nor ``prompt`` is set, uses the "document", "passage", or "corpus" prompt (in that order) if available.
+                Defaults to None.
+            prompt (Optional[str], optional): The prompt to use for encoding. For example, if the prompt is
+                "passage: ", then the sentence "The cat sat on the mat." will be encoded as
+                "passage: The cat sat on the mat.". If ``prompt`` is set, ``prompt_name`` is ignored.
+                Defaults to None.
             batch_size (int, optional): The batch size used for the computation. Defaults to 32.
             show_progress_bar (bool, optional): Whether to output a progress bar when encode sentences. Defaults to None.
             convert_to_tensor (bool, optional): Whether the output should be a single stacked tensor (True) or a list
@@ -373,12 +426,20 @@ class SparseEncoder(BaseModel):
                     "The article explores the history of artificial intelligence development.",
                     "This document contains technical specifications for the new product line.",
                 ]
-                embeddings = model.encode(sentences)
+                embeddings = model.encode_document(sentences)
                 print(embeddings.shape)
                 # (3, 30522)
         """
+        if prompt_name is None and prompt is None:
+            for candidate_prompt_name in ["document", "passage", "corpus"]:
+                if candidate_prompt_name in self.prompts:
+                    prompt_name = candidate_prompt_name
+                    break
+
         return self.encode(
             sentences=sentences,
+            prompt_name=prompt_name,
+            prompt=prompt,
             batch_size=batch_size,
             show_progress_bar=show_progress_bar,
             convert_to_tensor=convert_to_tensor,
@@ -395,6 +456,8 @@ class SparseEncoder(BaseModel):
     def encode(
         self,
         sentences: list[StrInputs] | StrInputs,
+        prompt_name: str | None = None,
+        prompt: str | None = None,
         batch_size: int = 32,
         show_progress_bar: bool | None = None,
         convert_to_tensor: bool = True,
@@ -520,6 +583,8 @@ class SparseEncoder(BaseModel):
                 device=device,
                 chunk_size=chunk_size,
                 # Encoding parameters
+                prompt_name=prompt_name,
+                prompt=prompt,
                 batch_size=batch_size,
                 convert_to_tensor=convert_to_tensor,
                 convert_to_sparse_tensor=convert_to_sparse_tensor,
@@ -530,6 +595,24 @@ class SparseEncoder(BaseModel):
             if is_singular_input:
                 embeddings = embeddings[0]
             return embeddings
+
+        # Handle prompts
+        if prompt is None:
+            if prompt_name is not None:
+                try:
+                    prompt = self.prompts[prompt_name]
+                except KeyError:
+                    raise ValueError(
+                        f"Prompt name '{prompt_name}' not found in the configured prompts dictionary with keys {list(self.prompts.keys())!r}."
+                    )
+            elif self.default_prompt_name is not None:
+                prompt = self.prompts.get(self.default_prompt_name, None)
+        else:
+            if prompt_name is not None:
+                logger.warning(
+                    "Encode with either a `prompt`, a `prompt_name`, or neither, but not both. "
+                    "Ignoring the `prompt_name` in favor of `prompt`."
+                )
 
         # Here, device is either a single device string (e.g., "cuda:0", "cpu") for single-process encoding or None
         if device is None:
@@ -547,7 +630,7 @@ class SparseEncoder(BaseModel):
 
         for start_index in trange(0, len(sentences), batch_size, desc="Batches", disable=not show_progress_bar):
             sentences_batch = sentences_sorted[start_index : start_index + batch_size]
-            features = self.preprocess(sentences_batch, **kwargs)
+            features = self.preprocess(sentences_batch, prompt=prompt, **kwargs)
             features = batch_to_device(features, self.device)
 
             with torch.inference_mode():
@@ -582,10 +665,19 @@ class SparseEncoder(BaseModel):
 
     def _get_model_config(self) -> dict[str, Any]:
         return super()._get_model_config() | {
+            "prompts": self.prompts,
+            "default_prompt_name": self.default_prompt_name,
             "similarity_fn_name": self._similarity_fn_name,
         }
 
     def _parse_model_config(self, model_config: dict[str, Any]) -> None:
+        # Set prompts if not already overridden by the __init__ calls
+        # Only update prompts that aren't already set by the user or defaults
+        for prompt_name, prompt_text in model_config.get("prompts", {}).items():
+            if prompt_name not in self.prompts or not self.prompts[prompt_name]:
+                self.prompts[prompt_name] = prompt_text
+        if not self.default_prompt_name:
+            self.default_prompt_name = model_config.get("default_prompt_name", None)
         if self._similarity_fn_name is None:
             self.similarity_fn_name = model_config.get("similarity_fn_name", None)
 
@@ -618,6 +710,20 @@ class SparseEncoder(BaseModel):
         if value is not None:
             self._similarity = SimilarityFunction.to_similarity_fn(value)
             self._similarity_pairwise = SimilarityFunction.to_similarity_pairwise_fn(value)
+
+    def set_pooling_include_prompt(self, include_prompt: bool) -> None:
+        """
+        Sets the ``include_prompt`` attribute in the pooling layer in the model, if there is one.
+
+        This is useful for INSTRUCTOR-style models where the prompt should be excluded from the
+        pooling strategy.
+        """
+        from sentence_transformers.sentence_transformer.models import Pooling
+
+        for module in self:
+            if isinstance(module, Pooling):
+                module.include_prompt = include_prompt
+                break
 
     @overload
     def similarity(self, embeddings1: Tensor, embeddings2: Tensor) -> Tensor: ...

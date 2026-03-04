@@ -27,6 +27,19 @@ class SparseEncoderTrainingArguments(BaseTrainingArguments):
             learning rates for different parts of the model, e.g., `{'SparseStaticEmbedding\.*': 1e-3}` for the
             SparseStaticEmbedding module. This is useful when you want to fine-tune specific parts of the model
             with different learning rates.
+        prompts (`Union[Dict[str, Dict[str, str]], Dict[str, str], str]`, *optional*):
+            The prompts to use for each column in the training, evaluation and test datasets. Four formats are accepted:
+
+            1. `str`: A single prompt to use for all columns in the datasets, regardless of whether the training/evaluation/test
+               datasets are :class:`datasets.Dataset` or a :class:`datasets.DatasetDict`.
+            2. `Dict[str, str]`: A dictionary mapping column names to prompts, regardless of whether the training/evaluation/test
+               datasets are :class:`datasets.Dataset` or a :class:`datasets.DatasetDict`.
+            3. `Dict[str, str]`: A dictionary mapping dataset names to prompts. This should only be used if your training/evaluation/test
+               datasets are a :class:`datasets.DatasetDict` or a dictionary of :class:`datasets.Dataset`.
+            4. `Dict[str, Dict[str, str]]`: A dictionary mapping dataset names to dictionaries mapping column names to
+               prompts. This should only be used if your training/evaluation/test datasets are a
+               :class:`datasets.DatasetDict` or a dictionary of :class:`datasets.Dataset`.
+
         router_mapping (`Dict[str, str] | Dict[str, Dict[str, str]]`, *optional*):
             A mapping of dataset column names to Router routes, like "query" or "document". This is used to specify
             which Router submodule to use for each dataset. Two formats are accepted:
@@ -40,8 +53,16 @@ class SparseEncoderTrainingArguments(BaseTrainingArguments):
     # We need to track what fields those can be. Each time a new arg
     # has a dict type, it must be added to this list.
     # Important: These should be typed with Optional[Union[dict,str,...]]
-    _VALID_DICT_FIELDS = BaseTrainingArguments._VALID_DICT_FIELDS + ["router_mapping"]
+    _VALID_DICT_FIELDS = BaseTrainingArguments._VALID_DICT_FIELDS + ["prompts", "router_mapping"]
 
+    prompts: Union[str, None, dict[str, str], dict[str, dict[str, str]]] = field(  # noqa: UP007
+        default=None,
+        metadata={
+            "help": "The prompts to use for each column in the datasets. "
+            "Either 1) a single string prompt, 2) a mapping of column names to prompts, 3) a mapping of dataset names "
+            "to prompts, or 4) a mapping of dataset names to a mapping of column names to prompts."
+        },
+    )
     router_mapping: Union[str, None, dict[str, str], dict[str, dict[str, str]]] = field(  # noqa: UP007
         default_factory=dict,
         metadata={

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import copy
+import json
+import logging
 import re
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -196,73 +199,6 @@ def test_inference_free_splade(inference_free_splade_bert_tiny_model: SparseEnco
     assert model.max_seq_length == 256
     assert model[0].sub_modules["query"][0].max_seq_length == 256
     assert model[0].sub_modules["document"][0].max_seq_length == 256
-
-
-@pytest.mark.parametrize("sentences", ["Hello world", ["Hello world", "This is a test"], [], [""]])
-@pytest.mark.parametrize("convert_to_tensor", [True, False])
-@pytest.mark.parametrize("convert_to_sparse_tensor", [True, False])
-def test_encode_query(
-    splade_bert_tiny_model: SparseEncoder,
-    sentences: str | list[str],
-    convert_to_tensor: bool,
-    convert_to_sparse_tensor: bool,
-):
-    model = splade_bert_tiny_model
-
-    # Create a mock for the encode method
-    with patch.object(model, "encode", autospec=True) as mock_encode:
-        # Call encode_query
-        model.encode_query(
-            sentences=sentences,
-            batch_size=32,
-            convert_to_tensor=convert_to_tensor,
-            convert_to_sparse_tensor=convert_to_sparse_tensor,
-        )
-
-        mock_encode.assert_called_once()
-        args, kwargs = mock_encode.call_args
-
-        # Check that sentences were passed correctly
-        assert kwargs["sentences"] == sentences
-
-        # Check other parameters
-        assert kwargs["convert_to_tensor"] == convert_to_tensor
-        assert kwargs["convert_to_sparse_tensor"] == convert_to_sparse_tensor
-        assert kwargs["task"] == "query"
-
-
-@pytest.mark.parametrize("sentences", ["Hello world", ["Hello world", "This is a test"], [], [""]])
-@pytest.mark.parametrize("convert_to_tensor", [True, False])
-@pytest.mark.parametrize("convert_to_sparse_tensor", [True, False])
-def test_encode_document(
-    splade_bert_tiny_model: SparseEncoder,
-    sentences: str | list[str],
-    convert_to_tensor: bool,
-    convert_to_sparse_tensor: bool,
-):
-    model = splade_bert_tiny_model
-
-    # Create a mock for the encode method
-    with patch.object(model, "encode", autospec=True) as mock_encode:
-        # Call encode_document
-        model.encode_document(
-            sentences=sentences,
-            batch_size=32,
-            convert_to_tensor=convert_to_tensor,
-            convert_to_sparse_tensor=convert_to_sparse_tensor,
-        )
-
-        # Verify that encode was called with the correct parameters
-        mock_encode.assert_called_once()
-        args, kwargs = mock_encode.call_args
-
-        # Check that sentences were passed correctly
-        assert kwargs["sentences"] == sentences
-
-        # Check other parameters
-        assert kwargs["convert_to_tensor"] == convert_to_tensor
-        assert kwargs["convert_to_sparse_tensor"] == convert_to_sparse_tensor
-        assert kwargs["task"] == "document"
 
 
 def test_encode_advanced_parameters(splade_bert_tiny_model: SparseEncoder):
@@ -583,3 +519,206 @@ def test_similarity_fn_name_constructor_overrides_saved(splade_bert_tiny_model: 
     splade_bert_tiny_model.save(str(tmp_path))
     model = SparseEncoder(str(tmp_path), similarity_fn_name="dot")
     assert model.similarity_fn_name == "dot"
+
+
+def test_prompts(splade_bert_tiny_model: SparseEncoder, caplog: pytest.LogCaptureFixture) -> None:
+    model = splade_bert_tiny_model
+    assert model.prompts == {"query": "", "document": ""}
+    assert model.default_prompt_name is None
+    texts = ["How to bake a chocolate cake", "Symptoms of the flu"]
+    no_prompt_embedding = model.encode(texts, convert_to_sparse_tensor=False, save_to_cpu=True)
+    prompt_embedding = model.encode(
+        [f"query: {text}" for text in texts], convert_to_sparse_tensor=False, save_to_cpu=True
+    )
+    assert not np.array_equal(no_prompt_embedding, prompt_embedding)
+
+    query = "query: "
+    # Test prompt="query: "
+    model.prompts = {"query": "", "document": ""}
+    assert np.array_equal(
+        model.encode(texts, prompt=query, convert_to_sparse_tensor=False, save_to_cpu=True), prompt_embedding
+    )
+
+    # Test prompt_name="..."
+    model.prompts = {"query": query, "document": ""}
+    assert np.array_equal(
+        model.encode(texts, prompt_name="query", convert_to_sparse_tensor=False, save_to_cpu=True), prompt_embedding
+    )
+
+    caplog.clear()
+    # Test prompt_name="..." & prompt="..."
+    with caplog.at_level(logging.WARNING):
+        assert np.array_equal(
+            model.encode(texts, prompt=query, prompt_name="query", convert_to_sparse_tensor=False, save_to_cpu=True),
+            prompt_embedding,
+        )
+        assert len(caplog.record_tuples) == 1
+        assert (
+            caplog.record_tuples[0][2] == "Encode with either a `prompt`, a `prompt_name`, or neither, but not both. "
+            "Ignoring the `prompt_name` in favor of `prompt`."
+        )
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Prompt name 'invalid_prompt_name' not found in the configured prompts dictionary with keys ['query', 'document']."
+        ),
+    ):
+        model.encode(texts, prompt_name="invalid_prompt_name")
+
+
+def test_save_load_prompts() -> None:
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Default prompt name 'invalid_prompt_name' not found in the configured prompts dictionary with keys ['query', 'document']."
+        ),
+    ):
+        SparseEncoder(
+            "sparse-encoder-testing/splade-bert-tiny-nq",
+            prompts={"query": "query: "},
+            default_prompt_name="invalid_prompt_name",
+        )
+
+    model = SparseEncoder(
+        "sparse-encoder-testing/splade-bert-tiny-nq",
+        prompts={"query": "query: "},
+        default_prompt_name="query",
+    )
+    assert model.prompts == {"query": "query: ", "document": ""}
+    assert model.default_prompt_name == "query"
+
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_folder:
+        model_path = Path(tmp_folder) / "tiny_model_local"
+        model.save(str(model_path))
+        config_path = model_path / "config_sentence_transformers.json"
+        assert config_path.exists()
+        with open(config_path, encoding="utf8") as f:
+            saved_config = json.load(f)
+        assert saved_config["prompts"] == {"query": "query: ", "document": ""}
+        assert saved_config["default_prompt_name"] == "query"
+
+        fresh_model = SparseEncoder(str(model_path))
+        assert fresh_model.prompts == {"query": "query: ", "document": ""}
+        assert fresh_model.default_prompt_name == "query"
+
+
+@pytest.mark.parametrize("sentences", ["Hello world", ["Hello world", "This is a test"], [], [""]])
+@pytest.mark.parametrize("convert_to_tensor", [True, False])
+@pytest.mark.parametrize("convert_to_sparse_tensor", [True, False])
+@pytest.mark.parametrize("prompt_name", [None, "query", "custom"])
+@pytest.mark.parametrize("prompt", [None, "Custom prompt: "])
+def test_encode_query(
+    splade_bert_tiny_model: SparseEncoder,
+    sentences: str | list[str],
+    convert_to_tensor: bool,
+    convert_to_sparse_tensor: bool,
+    prompt_name: str | None,
+    prompt: str | None,
+):
+    model = splade_bert_tiny_model
+    model.prompts = {"query": "query: ", "custom": "custom: "}
+
+    with patch.object(model, "encode", autospec=True) as mock_encode:
+        model.encode_query(
+            sentences=sentences,
+            batch_size=32,
+            convert_to_tensor=convert_to_tensor,
+            convert_to_sparse_tensor=convert_to_sparse_tensor,
+            prompt_name=prompt_name,
+            prompt=prompt,
+        )
+
+        if prompt_name:
+            expected_prompt_name = prompt_name
+        elif prompt is not None:
+            expected_prompt_name = None
+        else:
+            expected_prompt_name = "query"
+
+        mock_encode.assert_called_once()
+        args, kwargs = mock_encode.call_args
+
+        assert kwargs["sentences"] == sentences
+        assert kwargs["convert_to_tensor"] == convert_to_tensor
+        assert kwargs["convert_to_sparse_tensor"] == convert_to_sparse_tensor
+        assert kwargs["prompt"] == prompt
+        assert kwargs["prompt_name"] == expected_prompt_name
+        assert kwargs["task"] == "query"
+
+
+@pytest.mark.parametrize("sentences", ["Hello world", ["Hello world", "This is a test"], [], [""]])
+@pytest.mark.parametrize("convert_to_tensor", [True, False])
+@pytest.mark.parametrize("convert_to_sparse_tensor", [True, False])
+@pytest.mark.parametrize("prompt_name", [None, "document", "passage", "corpus", "custom"])
+@pytest.mark.parametrize("prompt", [None, "Custom prompt: "])
+def test_encode_document(
+    splade_bert_tiny_model: SparseEncoder,
+    sentences: str | list[str],
+    convert_to_tensor: bool,
+    convert_to_sparse_tensor: bool,
+    prompt_name: str | None,
+    prompt: str | None,
+):
+    model = splade_bert_tiny_model
+    model.prompts = {"document": "document: ", "passage": "passage: ", "corpus": "corpus: ", "custom": "custom: "}
+
+    with patch.object(model, "encode", autospec=True) as mock_encode:
+        model.encode_document(
+            sentences=sentences,
+            batch_size=32,
+            convert_to_tensor=convert_to_tensor,
+            convert_to_sparse_tensor=convert_to_sparse_tensor,
+            prompt_name=prompt_name,
+            prompt=prompt,
+        )
+
+        mock_encode.assert_called_once()
+        args, kwargs = mock_encode.call_args
+
+        if prompt_name:
+            expected_prompt_name = prompt_name
+        elif prompt is not None:
+            expected_prompt_name = None
+        else:
+            expected_prompt_name = "document"
+
+        assert kwargs["sentences"] == sentences
+        assert kwargs["convert_to_tensor"] == convert_to_tensor
+        assert kwargs["convert_to_sparse_tensor"] == convert_to_sparse_tensor
+        assert kwargs["prompt"] == prompt
+        assert kwargs["prompt_name"] == expected_prompt_name
+        assert kwargs["task"] == "document"
+
+
+def test_encode_document_prompt_priority(splade_bert_tiny_model: SparseEncoder):
+    """Test that proper prompt priority is respected when multiple options are available"""
+    model = splade_bert_tiny_model
+    model.prompts = {
+        "document": "document: ",
+        "passage": "passage: ",
+        "corpus": "corpus: ",
+    }
+
+    with patch.object(model, "encode", autospec=True) as mock_encode:
+        model.encode_document("test")
+        args, kwargs = mock_encode.call_args
+        assert kwargs["prompt_name"] == "document"
+
+        # Remove document, should fall back to passage
+        model.prompts = {"passage": "passage: ", "corpus": "corpus: "}
+        model.encode_document("test")
+        args, kwargs = mock_encode.call_args
+        assert kwargs["prompt_name"] == "passage"
+
+        # Remove passage, should fall back to corpus
+        model.prompts = {"corpus": "corpus: "}
+        model.encode_document("test")
+        args, kwargs = mock_encode.call_args
+        assert kwargs["prompt_name"] == "corpus"
+
+        # No document/passage/corpus, should use None
+        model.prompts = {"custom": "custom: "}
+        model.encode_document("test")
+        args, kwargs = mock_encode.call_args
+        assert kwargs["prompt_name"] is None
