@@ -18,9 +18,8 @@ from tqdm.autonotebook import trange
 from typing_extensions import deprecated
 
 from sentence_transformers.base.model import BaseModel
-from sentence_transformers.base.models import Transformer
-from sentence_transformers.base.models.modality_utils import ArrayInputs, DictInputs, ImageInputs, StrInputs
-from sentence_transformers.sentence_transformer.models import Pooling
+from sentence_transformers.base.modules.modality_utils import ArrayInputs, DictInputs, ImageInputs, StrInputs
+from sentence_transformers.modules import Pooling, Transformer
 from sentence_transformers.util import batch_to_device, truncate_embeddings
 from sentence_transformers.util.quantization import quantize_embeddings
 from sentence_transformers.util.similarity import SimilarityFunction
@@ -214,7 +213,7 @@ class SentenceTransformer(BaseModel, FitMixin):
 
         1. If no ``prompt_name`` or ``prompt`` is provided, it uses a predefined "query" prompt,
            if available in the model's ``prompts`` dictionary.
-        2. It sets the ``task`` to "query". If the model has a :class:`~sentence_transformers.base.models.Router`
+        2. It sets the ``task`` to "query". If the model has a :class:`~sentence_transformers.base.modules.Router`
            module, it will use the "query" task type to route the input through the appropriate submodules.
 
         .. tip::
@@ -274,7 +273,7 @@ class SentenceTransformer(BaseModel, FitMixin):
 
         1. If no ``prompt_name`` or ``prompt`` is provided, it uses a predefined "document" prompt,
            if available in the model's ``prompts`` dictionary.
-        2. It sets the ``task`` to "document". If the model has a :class:`~sentence_transformers.base.models.Router`
+        2. It sets the ``task`` to "document". If the model has a :class:`~sentence_transformers.base.modules.Router`
            module, it will use the "document" task type to route the input through the appropriate submodules.
 
         .. tip::

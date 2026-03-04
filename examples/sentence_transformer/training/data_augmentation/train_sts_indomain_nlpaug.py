@@ -39,10 +39,11 @@ import torch
 import tqdm
 from datasets import Dataset, concatenate_datasets, load_dataset
 
-from sentence_transformers import SentenceTransformer, losses
-from sentence_transformers.base.trainer import SentenceTransformerTrainer
-from sentence_transformers.base.training_args import BaseTrainingArguments
+from sentence_transformers import SentenceTransformer
 from sentence_transformers.sentence_transformer.evaluation import EmbeddingSimilarityEvaluator
+from sentence_transformers.sentence_transformer.losses import CosineSimilarityLoss
+from sentence_transformers.sentence_transformer.trainer import SentenceTransformerTrainer
+from sentence_transformers.sentence_transformer.training_args import SentenceTransformerTrainingArguments
 from sentence_transformers.util.similarity import SimilarityFunction
 
 # Set the log level to INFO to get more information
@@ -120,7 +121,7 @@ logging.info(f"Number of silver pairs generated: {len(silver_samples)}")
 ###################################################################
 
 train_dataset = concatenate_datasets([train_dataset, silver_dataset])
-train_loss = losses.CosineSimilarityLoss(model=model)
+train_loss = CosineSimilarityLoss(model=model)
 
 logging.info("Read STSbenchmark dev dataset")
 evaluator = EmbeddingSimilarityEvaluator(
@@ -132,7 +133,7 @@ evaluator = EmbeddingSimilarityEvaluator(
 )
 
 # Define the training arguments
-args = BaseTrainingArguments(
+args = SentenceTransformerTrainingArguments(
     # Required parameter:
     output_dir=output_dir,
     # Optional training parameters:

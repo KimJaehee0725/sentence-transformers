@@ -5,12 +5,11 @@ import torch
 from datasets import load_dataset
 
 from sentence_transformers import CrossEncoder, SentenceTransformer, SparseEncoder
-from sentence_transformers.base.models import Transformer
 from sentence_transformers.cross_encoder.evaluation import CrossEncoderRerankingEvaluator
+from sentence_transformers.modules import SpladePooling, Transformer
 from sentence_transformers.sentence_transformer.evaluation import InformationRetrievalEvaluator
 from sentence_transformers.sparse_encoder.evaluation import SparseInformationRetrievalEvaluator
 from sentence_transformers.sparse_encoder.evaluation.ReciprocalRankFusionEvaluator import ReciprocalRankFusionEvaluator
-from sentence_transformers.sparse_encoder.models import SpladePooling
 
 # Configure logging
 logging.basicConfig(format="%(message)s", level=logging.INFO)

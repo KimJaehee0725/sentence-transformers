@@ -16,10 +16,9 @@ from sentence_transformers import (
     SentenceTransformerTrainer,
     SentenceTransformerTrainingArguments,
 )
-from sentence_transformers.base.models.InputModule import InputModule
+from sentence_transformers.base.modules.InputModule import InputModule
+from sentence_transformers.modules import Asym, Dense, Normalize, Router, StaticEmbedding
 from sentence_transformers.sentence_transformer.losses import MultipleNegativesRankingLoss
-from sentence_transformers.sentence_transformer.models import Asym, Dense, Normalize, Router
-from sentence_transformers.sentence_transformer.models.StaticEmbedding import StaticEmbedding
 from sentence_transformers.util import is_datasets_available
 
 if is_datasets_available():
@@ -281,28 +280,22 @@ def test_router_backwards_compatibility(static_embedding_model):
 
 
 @pytest.mark.parametrize(
-    ("module_names", "module_attributes"),
+    "module_name",
     [
-        (
-            [
-                "sentence_transformers.models.Asym",
-                "sentence_transformers.models.Router",
-                "sentence_transformers.models",
-                "sentence_transformers.sentence_transformer.models.Asym",
-                "sentence_transformers.sentence_transformer.models.Router",
-                "sentence_transformers.sentence_transformer.models",
-                "sentence_transformers.base.models.Router",
-            ],
-            [Asym, Router],
-        ),
+        "sentence_transformers.models.Asym",
+        "sentence_transformers.models.Router",
+        "sentence_transformers.models",
+        "sentence_transformers.sentence_transformer.modules.Asym",
+        "sentence_transformers.sentence_transformer.modules.Router",
+        "sentence_transformers.sentence_transformer.modules",
+        "sentence_transformers.base.modules.Router",
     ],
 )
-def test_asym_import(module_names: list[str], module_attributes: list[object]) -> None:
-    for module_name in module_names:
-        module = importlib.import_module(module_name)
-        for module_attribute in module_attributes:
-            obj = getattr(module, module_attribute.__name__, None)
-            assert obj is module_attribute
+def test_asym_import(module_name: str) -> None:
+    module = importlib.import_module(module_name)
+    for module_attribute in [Asym, Router]:
+        obj = getattr(module, module_attribute.__name__, None)
+        assert obj is module_attribute
 
 
 def test_router_save_load(static_embedding_model: StaticEmbedding, tmp_path: Path):

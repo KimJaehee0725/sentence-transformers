@@ -13,7 +13,7 @@ except ImportError:
 import torch
 from transformers import AutoTokenizer
 
-from sentence_transformers.base.models.InputModule import InputModule
+from sentence_transformers.base.modules.InputModule import InputModule
 
 if TYPE_CHECKING:
     from transformers import PreTrainedTokenizer

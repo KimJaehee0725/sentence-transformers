@@ -8,7 +8,7 @@ except ImportError:
 import torch.nn.functional as F
 from torch import Tensor
 
-from sentence_transformers.base.models.Module import Module
+from sentence_transformers.base.modules.Module import Module
 
 
 class Normalize(Module):

@@ -29,7 +29,7 @@ from transformers import __version__ as transformers_version
 from transformers.utils import is_peft_available
 
 from sentence_transformers import SentenceTransformer, util
-from sentence_transformers.sentence_transformer.models import (
+from sentence_transformers.modules import (
     CNN,
     LSTM,
     CLIPModel,

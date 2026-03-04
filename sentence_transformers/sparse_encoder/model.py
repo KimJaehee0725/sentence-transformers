@@ -17,10 +17,9 @@ from transformers import AutoConfig, PretrainedConfig
 from transformers.modeling_utils import PreTrainedModel
 
 from sentence_transformers.base import BaseModel
-from sentence_transformers.base.models.modality_utils import StrInputs
-from sentence_transformers.sentence_transformer.models import Pooling, Transformer
+from sentence_transformers.base.modules.modality_utils import StrInputs
+from sentence_transformers.modules import Pooling, SparseAutoEncoder, SpladePooling, Transformer
 from sentence_transformers.sparse_encoder.model_card import SparseEncoderModelCardData
-from sentence_transformers.sparse_encoder.models import SparseAutoEncoder, SpladePooling
 from sentence_transformers.util import batch_to_device, select_max_active_dims
 from sentence_transformers.util.similarity import SimilarityFunction
 
@@ -234,7 +233,7 @@ class SparseEncoder(BaseModel):
 
         This method is a specialized version of :meth:`encode` that differs in exactly one way:
 
-        1. It sets the ``task`` to "query". If the model has a :class:`~sentence_transformers.base.models.Router`
+        1. It sets the ``task`` to "query". If the model has a :class:`~sentence_transformers.base.modules.Router`
            module, it will use the "query" task type to route the input through the appropriate submodules.
 
         .. tip::
@@ -352,7 +351,7 @@ class SparseEncoder(BaseModel):
 
         This method is a specialized version of :meth:`encode` that differs in exactly one way:
 
-        1. It sets the ``task`` to "document". If the model has a :class:`~sentence_transformers.base.models.Router`
+        1. It sets the ``task`` to "document". If the model has a :class:`~sentence_transformers.base.modules.Router`
            module, it will use the "document" task type to route the input through the appropriate submodules.
 
         .. tip::
@@ -718,7 +717,7 @@ class SparseEncoder(BaseModel):
         This is useful for INSTRUCTOR-style models where the prompt should be excluded from the
         pooling strategy.
         """
-        from sentence_transformers.sentence_transformer.models import Pooling
+        from sentence_transformers.modules import Pooling
 
         for module in self:
             if isinstance(module, Pooling):

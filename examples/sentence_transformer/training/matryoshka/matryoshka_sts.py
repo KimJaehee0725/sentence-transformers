@@ -18,16 +18,16 @@ from datetime import datetime
 from datasets import load_dataset
 
 from sentence_transformers import (
-    BaseTrainingArguments,
     SentenceTransformer,
     SentenceTransformerTrainer,
-    losses,
+    SentenceTransformerTrainingArguments,
 )
 from sentence_transformers.sentence_transformer.evaluation import (
     EmbeddingSimilarityEvaluator,
     SequentialEvaluator,
     SimilarityFunction,
 )
+from sentence_transformers.sentence_transformer.losses import CoSENTLoss, MatryoshkaLoss
 
 # Set the log level to INFO to get more information
 logging.basicConfig(format="%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
@@ -56,8 +56,8 @@ logging.info(train_dataset)
 # 3. Define our training loss
 # CoSENTLoss (https://sbert.net/docs/package_reference/sentence_transformer/losses.html#cosentloss) needs two text columns and one
 # similarity score column (between 0 and 1)
-inner_train_loss = losses.CoSENTLoss(model=model)
-train_loss = losses.MatryoshkaLoss(model, loss=inner_train_loss, matryoshka_dims=matryoshka_dims)
+inner_train_loss = CoSENTLoss(model=model)
+train_loss = MatryoshkaLoss(model, loss=inner_train_loss, matryoshka_dims=matryoshka_dims)
 
 # 4. Define an evaluator for use during training. This is useful to keep track of alongside the evaluation loss.
 evaluators = []
@@ -75,7 +75,7 @@ for dim in matryoshka_dims:
 dev_evaluator = SequentialEvaluator(evaluators, main_score_function=lambda scores: scores[0])
 
 # 5. Define the training arguments
-args = BaseTrainingArguments(
+args = SentenceTransformerTrainingArguments(
     # Required parameter:
     output_dir=output_dir,
     # Optional training parameters:

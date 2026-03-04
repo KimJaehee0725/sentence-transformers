@@ -14,7 +14,7 @@ We introduce two new methods, :meth:`~sentence_transformers.sentence_transformer
 
 1. If no ``prompt_name`` or ``prompt`` is provided, it uses a predefined "query" prompt,
    if available in the model's ``prompts`` dictionary.
-2. It sets the ``task`` to "query". If the model has a :class:`~sentence_transformers.base.models.Router`
+2. It sets the ``task`` to "query". If the model has a :class:`~sentence_transformers.base.modules.Router`
    module, it will use the "query" task type to route the input through the appropriate submodules.
 
 The same methods apply to the :class:`~sentence_transformers.sparse_encoder.model.SparseEncoder` models.
@@ -157,9 +157,9 @@ The ``truncate_dim`` parameter allows you to reduce the dimensionality of embedd
 
 ```{eval-rst}
 
-The ``Asym`` module has been renamed and updated to the new :class:`~sentence_transformers.base.models.Router` module, which provides the same functionality but with a more consistent API and additional features. The new :class:`~sentence_transformers.base.models.Router` module allows for more flexible routing of different tasks, such as query and document embeddings, and is recommended when working with asymmetric models that require different processing for different tasks, notably queries and documents.
+The ``Asym`` module has been renamed and updated to the new :class:`~sentence_transformers.base.modules.Router` module, which provides the same functionality but with a more consistent API and additional features. The new :class:`~sentence_transformers.base.modules.Router` module allows for more flexible routing of different tasks, such as query and document embeddings, and is recommended when working with asymmetric models that require different processing for different tasks, notably queries and documents.
 
-The :meth:`~sentence_transformers.sentence_transformer.model.SentenceTransformer.encode_query` and :meth:`~sentence_transformers.sentence_transformer.model.SentenceTransformer.encode_document` methods automatically set the ``task`` parameter that is used by the :class:`~sentence_transformers.base.models.Router` module to route the input to the query or document submodules, respectively.
+The :meth:`~sentence_transformers.sentence_transformer.model.SentenceTransformer.encode_query` and :meth:`~sentence_transformers.sentence_transformer.model.SentenceTransformer.encode_document` methods automatically set the ``task`` parameter that is used by the :class:`~sentence_transformers.base.modules.Router` module to route the input to the query or document submodules, respectively.
 
 .. collapse:: Asym -> Router
 
@@ -211,7 +211,7 @@ The :meth:`~sentence_transformers.sentence_transformer.model.SentenceTransformer
            :emphasize-lines: 8-11, 22-23
 
            from sentence_transformers import SentenceTransformer
-           from sentence_transformers.base.models import Router, Normalize
+           from sentence_transformers.base.modules import Router, Normalize
 
            # Use a regular SentenceTransformer for the document embeddings,
            # and a static embedding model for the query embeddings
@@ -238,7 +238,7 @@ The :meth:`~sentence_transformers.sentence_transformer.model.SentenceTransformer
            :emphasize-lines: 8-11, 22-23
 
            from sentence_transformers import SentenceTransformer
-           from sentence_transformers.base.models import Router, Normalize
+           from sentence_transformers.base.modules import Router, Normalize
 
            # Use a regular SentenceTransformer for the document embeddings,
            # and a static embedding model for the query embeddings

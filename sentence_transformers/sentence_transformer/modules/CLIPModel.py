@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sentence_transformers.base.models.Transformer import ModalityConfig, Transformer
+from sentence_transformers.base.modules.Transformer import ModalityConfig, Transformer
 
 
 # For backwards compatibility, we ensure that the legacy `CLIPModel` alias points to the updated `Transformer` class.

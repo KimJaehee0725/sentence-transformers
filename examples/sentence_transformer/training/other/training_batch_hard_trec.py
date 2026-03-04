@@ -24,9 +24,10 @@ from datetime import datetime
 
 from datasets import Dataset, load_dataset
 
-from sentence_transformers import LoggingHandler, SentenceTransformer, losses
+from sentence_transformers import LoggingHandler, SentenceTransformer
 from sentence_transformers.base.sampler import BatchSamplers
 from sentence_transformers.sentence_transformer.evaluation import TripletEvaluator
+from sentence_transformers.sentence_transformer.losses import BatchAllTripletLoss
 from sentence_transformers.sentence_transformer.trainer import SentenceTransformerTrainer
 from sentence_transformers.sentence_transformer.training_args import SentenceTransformerTrainingArguments
 
@@ -107,7 +108,7 @@ model = SentenceTransformer(model_name)
 # - BatchSemiHardTripletLoss
 # - BatchAllTripletLoss
 
-train_loss = losses.BatchAllTripletLoss(model=model)
+train_loss = BatchAllTripletLoss(model=model)
 # train_loss = losses.BatchHardTripletLoss(model=model)
 # train_loss = losses.BatchHardSoftMarginTripletLoss(model=model)
 # train_loss = losses.BatchSemiHardTripletLoss(model=model)

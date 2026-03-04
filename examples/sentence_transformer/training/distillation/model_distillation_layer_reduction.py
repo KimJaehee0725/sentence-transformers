@@ -29,9 +29,9 @@ import torch
 from datasets import Dataset, concatenate_datasets, load_dataset
 
 from sentence_transformers import SentenceTransformer, evaluation, losses
-from sentence_transformers.base.trainer import SentenceTransformerTrainer
-from sentence_transformers.base.training_args import BaseTrainingArguments
 from sentence_transformers.sentence_transformer.evaluation import EmbeddingSimilarityEvaluator
+from sentence_transformers.sentence_transformer.trainer import SentenceTransformerTrainer
+from sentence_transformers.sentence_transformer.training_args import SentenceTransformerTrainingArguments
 from sentence_transformers.util.similarity import SimilarityFunction
 
 # Set the log level to INFO to get more information
@@ -167,7 +167,7 @@ dev_evaluator = evaluation.SequentialEvaluator([dev_evaluator_stsb, dev_evaluato
 dev_evaluator(student_model)
 
 # Define the training arguments
-args = BaseTrainingArguments(
+args = SentenceTransformerTrainingArguments(
     # Required parameter:
     output_dir=output_dir,
     # Optional training parameters:

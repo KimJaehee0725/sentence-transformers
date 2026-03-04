@@ -4,7 +4,7 @@ import traceback
 import torch
 from datasets import load_dataset
 
-from sentence_transformers.base.training_args import BatchSamplers
+from sentence_transformers.base.sampler import BatchSamplers
 from sentence_transformers.cross_encoder import CrossEncoder
 from sentence_transformers.cross_encoder.evaluation import CrossEncoderNanoBEIREvaluator
 from sentence_transformers.cross_encoder.losses.BinaryCrossEntropyLoss import BinaryCrossEntropyLoss

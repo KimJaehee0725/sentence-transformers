@@ -48,7 +48,7 @@ Training Sparse Encoder models involves between 4 to 6 components:
 ## Model
 ```{eval-rst}
 
-Sparse Encoder models consist of a sequence of `Modules <../package_reference/sentence_transformer/models.html>`_,  `Sparse Encoder specific Modules <../package_reference/sparse_encoder/models.html>`_ or `Custom Modules <../sentence_transformer/usage/custom_models.html#advanced-custom-modules>`_, allowing for a lot of flexibility. If you want to further finetune a SparseEncoder model (e.g. it has a `modules.json file <https://huggingface.co/naver/splade-cocondenser-ensembledistil/tree/main/modules.json>`_), then you don't have to worry about which modules are used::
+Sparse Encoder models consist of a sequence of `Modules <../package_reference/sentence_transformer/modules.html>`_,  `Sparse Encoder specific Modules <../package_reference/sparse_encoder/modules.html>`_ or `Custom Modules <../sentence_transformer/usage/custom_models.html#advanced-custom-modules>`_, allowing for a lot of flexibility. If you want to further finetune a SparseEncoder model (e.g. it has a `modules.json file <https://huggingface.co/naver/splade-cocondenser-ensembledistil/tree/main/modules.json>`_), then you don't have to worry about which modules are used::
 
     from sentence_transformers import SparseEncoder
 
@@ -58,23 +58,22 @@ But if instead you want to train from another checkpoint, or from scratch, then 
 
 .. tab:: Splade
 
-    Splade models use the :class:`~sentence_transformers.base.models.Transformer` with ``transformer_task="fill-mask"`` followed by a :class:`~sentence_transformers.sparse_encoder.models.SpladePooling` modules. The former loads a pretrained `Masked Language Modeling transformer model <https://huggingface.co/models?pipeline_tag=fill-mask>`_ (e.g. `BERT <https://huggingface.co/google-bert/bert-base-uncased>`_, `RoBERTa <https://huggingface.co/FacebookAI/roberta-base>`_, `DistilBERT <https://huggingface.co/distilbert/distilbert-base-uncased>`_, `ModernBERT <https://huggingface.co/answerdotai/ModernBERT-base>`_, etc.) and the latter pools the output of the Masked Language Modeling Head to produce a single sparse embedding of the size of the vocabulary.
+    Splade models use the :class:`~sentence_transformers.base.modules.Transformer` with ``transformer_task="fill-mask"`` followed by a :class:`~sentence_transformers.sparse_encoder.modules.SpladePooling` modules. The former loads a pretrained `Masked Language Modeling transformer model <https://huggingface.co/models?pipeline_tag=fill-mask>`_ (e.g. `BERT <https://huggingface.co/google-bert/bert-base-uncased>`_, `RoBERTa <https://huggingface.co/FacebookAI/roberta-base>`_, `DistilBERT <https://huggingface.co/distilbert/distilbert-base-uncased>`_, `ModernBERT <https://huggingface.co/answerdotai/ModernBERT-base>`_, etc.) and the latter pools the output of the Masked Language Modeling Head to produce a single sparse embedding of the size of the vocabulary.
     
     .. raw:: html
 
         <div class="sidebar">
             <p class="sidebar-title">Documentation</p>
             <ul class="simple">
-                <li><a class="reference internal" href="../package_reference/base/models.html#sentence_transformers.base.models.Transformer"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.base.models.Transformer</span></code></a></li>
-                <li><a class="reference internal" href="../package_reference/sparse_encoder/models.html#sentence_transformers.sparse_encoder.models.SpladePooling"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.sparse_encoder.models.SpladePooling</span></code></a></li>
+                <li><a class="reference internal" href="../package_reference/base/modules.html#sentence_transformers.base.modules.Transformer"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.base.modules.Transformer</span></code></a></li>
+                <li><a class="reference internal" href="../package_reference/sparse_encoder/modules.html#sentence_transformers.sparse_encoder.modules.SpladePooling"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.sparse_encoder.modules.SpladePooling</span></code></a></li>
             </ul>
         </div>
 
     ::
 
-        from sentence_transformers import models, SparseEncoder
-        from sentence_transformers.base.models import Transformer
-        from sentence_transformers.sparse_encoder.models import SpladePooling
+        from sentence_transformers import SparseEncoder
+        from sentence_transformers.modules import Transformer, SpladePooling
 
         # Initialize Transformer (use a fill-mask model)
         mlm_transformer = Transformer("google-bert/bert-base-uncased", transformer_task="fill-mask")
@@ -99,25 +98,24 @@ But if instead you want to train from another checkpoint, or from scratch, then 
 
 .. tab:: Inference-free Splade
 
-    Inference-free Splade uses a :class:`~sentence_transformers.base.models.Router` module with different modules for queries and documents. Usually for this type of architecture, the documents part is a traditional Splade architecture (a :class:`~sentence_transformers.base.models.Transformer` with ``transformer_task="fill-mask"`` followed by a :class:`~sentence_transformers.sparse_encoder.models.SpladePooling` module) and the query part is an :class:`~sentence_transformers.sparse_encoder.models.SparseStaticEmbedding` module, which just returns a pre-computed score for every token in the query.
+    Inference-free Splade uses a :class:`~sentence_transformers.base.modules.Router` module with different modules for queries and documents. Usually for this type of architecture, the documents part is a traditional Splade architecture (a :class:`~sentence_transformers.base.modules.Transformer` with ``transformer_task="fill-mask"`` followed by a :class:`~sentence_transformers.sparse_encoder.modules.SpladePooling` module) and the query part is an :class:`~sentence_transformers.sparse_encoder.modules.SparseStaticEmbedding` module, which just returns a pre-computed score for every token in the query.
 
     .. raw:: html
 
         <div class="sidebar">
             <p class="sidebar-title">Documentation</p>
             <ul class="simple">
-                <li><a class="reference internal" href="../package_reference/base/models.html#sentence_transformers.base.models.Router"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.base.models.Router</span></code></a></li>
-                <li><a class="reference internal" href="../package_reference/sparse_encoder/models.html#sentence_transformers.sparse_encoder.models.SparseStaticEmbedding"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.sparse_encoder.models.SparseStaticEmbedding</span></code></a></li>
-                <li><a class="reference internal" href="../package_reference/base/models.html#sentence_transformers.base.models.Transformer"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.base.models.Transformer</span></code></a></li>
-                <li><a class="reference internal" href="../package_reference/sparse_encoder/models.html#sentence_transformers.sparse_encoder.models.SpladePooling"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.sparse_encoder.models.SpladePooling</span></code></a></li>
+                <li><a class="reference internal" href="../package_reference/base/modules.html#sentence_transformers.base.modules.Router"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.base.modules.Router</span></code></a></li>
+                <li><a class="reference internal" href="../package_reference/sparse_encoder/modules.html#sentence_transformers.sparse_encoder.modules.SparseStaticEmbedding"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.sparse_encoder.modules.SparseStaticEmbedding</span></code></a></li>
+                <li><a class="reference internal" href="../package_reference/base/modules.html#sentence_transformers.base.modules.Transformer"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.base.modules.Transformer</span></code></a></li>
+                <li><a class="reference internal" href="../package_reference/sparse_encoder/modules.html#sentence_transformers.sparse_encoder.modules.SpladePooling"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.sparse_encoder.modules.SpladePooling</span></code></a></li>
             </ul>
         </div>
 
     ::
 
         from sentence_transformers import SparseEncoder
-        from sentence_transformers.base.models import Router, Transformer
-        from sentence_transformers.sparse_encoder.models import SparseStaticEmbedding, SpladePooling
+        from sentence_transformers.modules import Router, Transformer, SparseStaticEmbedding, SpladePooling
 
         # Initialize MLM Transformer for document encoding
         doc_encoder = Transformer("google-bert/bert-base-uncased", transformer_task="fill-mask")
@@ -140,7 +138,7 @@ But if instead you want to train from another checkpoint, or from scratch, then 
     
     .. note::
 
-        When training models with the :class:`~sentence_transformers.base.models.Router` module, you must use the ``router_mapping`` argument in the :class:`~sentence_transformers.sparse_encoder.training_args.SparseEncoderTrainingArguments` to map the training dataset columns to the correct route ("query" or "document"). For example, if your dataset(s) have ``["question", "answer"]`` columns, then you can use the following mapping::
+        When training models with the :class:`~sentence_transformers.base.modules.Router` module, you must use the ``router_mapping`` argument in the :class:`~sentence_transformers.sparse_encoder.training_args.SparseEncoderTrainingArguments` to map the training dataset columns to the correct route ("query" or "document"). For example, if your dataset(s) have ``["question", "answer"]`` columns, then you can use the following mapping::
 
             args = SparseEncoderTrainingArguments(
                 ...,
@@ -163,34 +161,34 @@ But if instead you want to train from another checkpoint, or from scratch, then 
 .. tab:: Contrastive Sparse Representation (CSR) 
 
     .. 
-        Contrastive Sparse Representation (CSR) models usually use a sequence of :class:`~sentence_transformers.sentence_transformer.models.Transformer`, :class:`~sentence_transformers.sentence_transformer.models.Pooling` and :class:`~sentence_transformers.sparse_encoder.models.SparseAutoEncoder` modules to create sparse representations on top of an already trained dense Sentence Transformer model.
+        Contrastive Sparse Representation (CSR) models usually use a sequence of :class:`~sentence_transformers.sentence_transformer.modules.Transformer`, :class:`~sentence_transformers.sentence_transformer.modules.Pooling` and :class:`~sentence_transformers.sparse_encoder.modules.SparseAutoEncoder` modules to create sparse representations on top of an already trained dense Sentence Transformer model.
 
-    Contrastive Sparse Representation (CSR) models apply a :class:`~sentence_transformers.sparse_encoder.models.SparseAutoEncoder` module on top of a dense Sentence Transformer model, which usually consist of a :class:`~sentence_transformers.sentence_transformer.models.Transformer` followed by a :class:`~sentence_transformers.sentence_transformer.models.Pooling` module. You can initialize one from scratch like so:
+    Contrastive Sparse Representation (CSR) models apply a :class:`~sentence_transformers.sparse_encoder.modules.SparseAutoEncoder` module on top of a dense Sentence Transformer model, which usually consist of a :class:`~sentence_transformers.sentence_transformer.modules.Transformer` followed by a :class:`~sentence_transformers.sentence_transformer.modules.Pooling` module. You can initialize one from scratch like so:
     
     .. 
-        usually use a sequence of :class:`~sentence_transformers.sentence_transformer.models.Transformer`, :class:`~sentence_transformers.sentence_transformer.models.Pooling` and :class:`~sentence_transformers.sparse_encoder.models.SparseAutoEncoder` modules to create sparse representations on top of an already trained dense Sentence Transformer model.
+        usually use a sequence of :class:`~sentence_transformers.sentence_transformer.modules.Transformer`, :class:`~sentence_transformers.sentence_transformer.modules.Pooling` and :class:`~sentence_transformers.sparse_encoder.modules.SparseAutoEncoder` modules to create sparse representations on top of an already trained dense Sentence Transformer model.
 
     .. raw:: html
 
         <div class="sidebar">
             <p class="sidebar-title">Documentation</p>
             <ul class="simple">
-                <li><a class="reference internal" href="../package_reference/base/models.html#sentence_transformers.base.models.Transformer"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.base.models.Transformer</span></code></a></li>
-                <li><a class="reference internal" href="../package_reference/sentence_transformer/models.html#sentence_transformers.sentence_transformer.models.Pooling"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.sentence_transformer.models.Pooling</span></code></a></li>
-                <li><a class="reference internal" href="../package_reference/sparse_encoder/models.html#sentence_transformers.sparse_encoder.models.SparseAutoEncoder"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.sparse_encoder.models.SparseAutoEncoder</span></code></a></li>
+                <li><a class="reference internal" href="../package_reference/base/modules.html#sentence_transformers.base.modules.Transformer"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.base.modules.Transformer</span></code></a></li>
+                <li><a class="reference internal" href="../package_reference/sentence_transformer/modules.html#sentence_transformers.sentence_transformer.modules.Pooling"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.sentence_transformer.modules.Pooling</span></code></a></li>
+                <li><a class="reference internal" href="../package_reference/sparse_encoder/modules.html#sentence_transformers.sparse_encoder.modules.SparseAutoEncoder"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.sparse_encoder.modules.SparseAutoEncoder</span></code></a></li>
             </ul>
         </div>
 
     ::
 
-        from sentence_transformers import models, SparseEncoder
-        from sentence_transformers.sparse_encoder.models import SparseAutoEncoder
+        from sentence_transformers import SparseEncoder
+        from sentence_transformers.modules import Transformer, Pooling, SparseAutoEncoder
 
         # Initialize transformer (can be any dense encoder model)
-        transformer = models.Transformer("google-bert/bert-base-uncased")
+        transformer = Transformer("google-bert/bert-base-uncased")
         
         # Initialize pooling
-        pooling = models.Pooling(transformer.get_word_embedding_dimension(), pooling_mode="mean")
+        pooling = Pooling(transformer.get_word_embedding_dimension(), pooling_mode="mean")
         
         # Initialize SparseAutoEncoder module
         sae = SparseAutoEncoder(
@@ -603,8 +601,8 @@ The :class:`~sentence_transformers.sparse_encoder.trainer.SparseEncoderTrainer` 
             <ol class="arabic">
                 <li><p><a class="reference internal" href="../package_reference/sparse_encoder/SparseEncoder.html#sentence_transformers.sparse_encoder.model.SparseEncoder" title="sentence_transformers.sparse_encoder.model.SparseEncoder"><code class="xref py py-class docutils literal notranslate"><span class="pre">SparseEncoder</span></code></a></p>
                 <ol class="loweralpha simple">
-                    <li><p><a class="reference internal" href="../package_reference/base/models.html#sentence_transformers.base.models.Transformer" title="sentence_transformers.base.models.Transformer"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transformer</span></code></a></p></li>
-                    <li><p><a class="reference internal" href="../package_reference/sparse_encoder/models.html#sentence_transformers.sparse_encoder.models.SpladePooling" title="sentence_transformers.sparse_encoder.models.SpladePooling"><code class="xref py py-class docutils literal notranslate"><span class="pre">SpladePooling</span></code></a></p></li>
+                    <li><p><a class="reference internal" href="../package_reference/base/modules.html#sentence_transformers.base.modules.Transformer" title="sentence_transformers.base.modules.Transformer"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transformer</span></code></a></p></li>
+                    <li><p><a class="reference internal" href="../package_reference/sparse_encoder/modules.html#sentence_transformers.sparse_encoder.modules.SpladePooling" title="sentence_transformers.sparse_encoder.modules.SpladePooling"><code class="xref py py-class docutils literal notranslate"><span class="pre">SpladePooling</span></code></a></p></li>
                 </ol>
                 </li>
                 <li><p><a class="reference internal" href="../package_reference/sparse_encoder/SparseEncoder.html#sentence_transformers.sparse_encoder.model_card.SparseEncoderModelCardData" title="sentence_transformers.sparse_encoder.model_card.SparseEncoderModelCardData"><code class="xref py py-class docutils literal notranslate"><span class="pre">SparseEncoderModelCardData</span></code></a></p></li>
@@ -719,10 +717,10 @@ The :class:`~sentence_transformers.sparse_encoder.trainer.SparseEncoderTrainer` 
             <ol class="arabic">
                 <li><p><a class="reference internal" href="../package_reference/sparse_encoder/SparseEncoder.html#sentence_transformers.sparse_encoder.model.SparseEncoder" title="sentence_transformers.sparse_encoder.model.SparseEncoder"><code class="xref py py-class docutils literal notranslate"><span class="pre">SparseEncoder</span></code></a></p>
                 <ol class="loweralpha simple">
-                    <li><p><a class="reference internal" href="../package_reference/sparse_encoder/models.html#sentence_transformers.sparse_encoder.models.SparseStaticEmbedding" title="sentence_transformers.sparse_encoder.models.SparseStaticEmbedding"><code class="xref py py-class docutils literal notranslate"><span class="pre">SparseStaticEmbedding</span></code></a></p></li>
-                    <li><p><a class="reference internal" href="../package_reference/base/models.html#sentence_transformers.base.models.Transformer" title="sentence_transformers.base.models.Transformer"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transformer</span></code></a></p></li>
-                    <li><p><a class="reference internal" href="../package_reference/sparse_encoder/models.html#sentence_transformers.sparse_encoder.models.SpladePooling" title="sentence_transformers.sparse_encoder.models.SpladePooling"><code class="xref py py-class docutils literal notranslate"><span class="pre">SpladePooling</span></code></a></p></li>
-                    <li><p><a class="reference internal" href="../package_reference/base/models.html#sentence_transformers.base.models.Router" title="sentence_transformers.base.models.Router"><code class="xref py py-class docutils literal notranslate"><span class="pre">Router</span></code></a></p></li>
+                    <li><p><a class="reference internal" href="../package_reference/sparse_encoder/modules.html#sentence_transformers.sparse_encoder.modules.SparseStaticEmbedding" title="sentence_transformers.sparse_encoder.modules.SparseStaticEmbedding"><code class="xref py py-class docutils literal notranslate"><span class="pre">SparseStaticEmbedding</span></code></a></p></li>
+                    <li><p><a class="reference internal" href="../package_reference/base/modules.html#sentence_transformers.base.modules.Transformer" title="sentence_transformers.base.modules.Transformer"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transformer</span></code></a></p></li>
+                    <li><p><a class="reference internal" href="../package_reference/sparse_encoder/modules.html#sentence_transformers.sparse_encoder.modules.SpladePooling" title="sentence_transformers.sparse_encoder.modules.SpladePooling"><code class="xref py py-class docutils literal notranslate"><span class="pre">SpladePooling</span></code></a></p></li>
+                    <li><p><a class="reference internal" href="../package_reference/base/modules.html#sentence_transformers.base.modules.Router" title="sentence_transformers.base.modules.Router"><code class="xref py py-class docutils literal notranslate"><span class="pre">Router</span></code></a></p></li>
                 </ol>
                 </li>
                 <li><p><a class="reference internal" href="../package_reference/sparse_encoder/SparseEncoder.html#sentence_transformers.sparse_encoder.model_card.SparseEncoderModelCardData" title="sentence_transformers.sparse_encoder.model_card.SparseEncoderModelCardData"><code class="xref py py-class docutils literal notranslate"><span class="pre">SparseEncoderModelCardData</span></code></a></p></li>
@@ -751,10 +749,9 @@ The :class:`~sentence_transformers.sparse_encoder.trainer.SparseEncoderTrainer` 
             SparseEncoderTrainer,
             SparseEncoderTrainingArguments,
         )
-        from sentence_transformers.base.models import Router, Transformer
+        from sentence_transformers.modules import Router, Transformer, SparseStaticEmbedding, SpladePooling
         from sentence_transformers.sparse_encoder.evaluation import SparseNanoBEIREvaluator
         from sentence_transformers.sparse_encoder.losses import SparseMultipleNegativesRankingLoss, SpladeLoss
-        from sentence_transformers.sparse_encoder.models import SparseStaticEmbedding, SpladePooling
         from sentence_transformers.sentence_transformer.training_args import BatchSamplers
 
         logging.basicConfig(format="%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)

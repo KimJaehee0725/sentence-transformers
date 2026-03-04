@@ -6,19 +6,19 @@ import torch
 from tokenizers import Tokenizer
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
-from sentence_transformers.base.models.modality_utils import (
+from sentence_transformers.base.modules.modality_utils import (
     ArrayInputs,
     DictInputs,
     ImageInputs,
     PairStrInputs,
     StrInputs,
 )
-from sentence_transformers.base.models.Module import Module
+from sentence_transformers.base.modules.Module import Module
 
 
 class InputModule(Module):
     """
-    Subclass of :class:`sentence_transformers.sentence_transformer.models.Module`, base class for all input modules in the Sentence
+    Subclass of :class:`sentence_transformers.sentence_transformer.modules.Module`, base class for all input modules in the Sentence
     Transformers library, i.e. modules that are used to process inputs and optionally also perform processing
     in the forward pass.
 
@@ -28,31 +28,31 @@ class InputModule(Module):
 
     Three abstract methods are defined in this class, which must be implemented by subclasses:
 
-    - :meth:`sentence_transformers.sentence_transformer.models.Module.forward`: The forward pass of the module.
-    - :meth:`sentence_transformers.sentence_transformer.models.Module.save`: Save the module to disk.
-    - :meth:`sentence_transformers.sentence_transformer.models.InputModule.tokenize`: Tokenize the input texts and return a dictionary of tokenized features.
+    - :meth:`sentence_transformers.sentence_transformer.modules.Module.forward`: The forward pass of the module.
+    - :meth:`sentence_transformers.sentence_transformer.modules.Module.save`: Save the module to disk.
+    - :meth:`sentence_transformers.sentence_transformer.modules.InputModule.tokenize`: Tokenize the input texts and return a dictionary of tokenized features.
 
     Optionally, you may also have to override:
 
-    - :meth:`sentence_transformers.sentence_transformer.models.Module.load`: Load the module from disk.
+    - :meth:`sentence_transformers.sentence_transformer.modules.Module.load`: Load the module from disk.
 
     To assist with loading and saving the module, several utility methods are provided:
 
-    - :meth:`sentence_transformers.sentence_transformer.models.Module.load_config`: Load the module's configuration from a JSON file.
-    - :meth:`sentence_transformers.sentence_transformer.models.Module.load_file_path`: Load a file from the module's directory, regardless of whether the module is saved locally or on Hugging Face.
-    - :meth:`sentence_transformers.sentence_transformer.models.Module.load_dir_path`: Load a directory from the module's directory, regardless of whether the module is saved locally or on Hugging Face.
-    - :meth:`sentence_transformers.sentence_transformer.models.Module.load_torch_weights`: Load the PyTorch weights of the module, regardless of whether the module is saved locally or on Hugging Face.
-    - :meth:`sentence_transformers.sentence_transformer.models.Module.save_config`: Save the module's configuration to a JSON file.
-    - :meth:`sentence_transformers.sentence_transformer.models.Module.save_torch_weights`: Save the PyTorch weights of the module.
-    - :meth:`sentence_transformers.sentence_transformer.models.InputModule.save_tokenizer`: Save the tokenizer used by the module.
-    - :meth:`sentence_transformers.sentence_transformer.models.Module.get_config_dict`: Get the module's configuration as a dictionary.
+    - :meth:`sentence_transformers.sentence_transformer.modules.Module.load_config`: Load the module's configuration from a JSON file.
+    - :meth:`sentence_transformers.sentence_transformer.modules.Module.load_file_path`: Load a file from the module's directory, regardless of whether the module is saved locally or on Hugging Face.
+    - :meth:`sentence_transformers.sentence_transformer.modules.Module.load_dir_path`: Load a directory from the module's directory, regardless of whether the module is saved locally or on Hugging Face.
+    - :meth:`sentence_transformers.sentence_transformer.modules.Module.load_torch_weights`: Load the PyTorch weights of the module, regardless of whether the module is saved locally or on Hugging Face.
+    - :meth:`sentence_transformers.sentence_transformer.modules.Module.save_config`: Save the module's configuration to a JSON file.
+    - :meth:`sentence_transformers.sentence_transformer.modules.Module.save_torch_weights`: Save the PyTorch weights of the module.
+    - :meth:`sentence_transformers.sentence_transformer.modules.InputModule.save_tokenizer`: Save the tokenizer used by the module.
+    - :meth:`sentence_transformers.sentence_transformer.modules.Module.get_config_dict`: Get the module's configuration as a dictionary.
 
     And several class variables are defined to assist with loading and saving the module:
 
-    - :attr:`sentence_transformers.sentence_transformer.models.Module.config_file_name`: The name of the configuration file used to save the module's configuration.
-    - :attr:`sentence_transformers.sentence_transformer.models.Module.config_keys`: A list of keys used to save the module's configuration.
-    - :attr:`sentence_transformers.sentence_transformer.models.InputModule.save_in_root`: Whether to save the module's configuration in the root directory of the model or in a subdirectory named after the module.
-    - :attr:`sentence_transformers.sentence_transformer.models.InputModule.tokenizer`: The tokenizer used by the module.
+    - :attr:`sentence_transformers.sentence_transformer.modules.Module.config_file_name`: The name of the configuration file used to save the module's configuration.
+    - :attr:`sentence_transformers.sentence_transformer.modules.Module.config_keys`: A list of keys used to save the module's configuration.
+    - :attr:`sentence_transformers.sentence_transformer.modules.InputModule.save_in_root`: Whether to save the module's configuration in the root directory of the model or in a subdirectory named after the module.
+    - :attr:`sentence_transformers.sentence_transformer.modules.InputModule.tokenizer`: The tokenizer used by the module.
     """
 
     save_in_root: bool = True

@@ -7,8 +7,8 @@ import torch
 from torch import Tensor, nn
 from transformers import PreTrainedTokenizerBase
 
+from sentence_transformers.modules import StaticEmbedding
 from sentence_transformers.sentence_transformer.model import SentenceTransformer
-from sentence_transformers.sentence_transformer.models import StaticEmbedding
 from sentence_transformers.util import all_gather_with_grad
 
 

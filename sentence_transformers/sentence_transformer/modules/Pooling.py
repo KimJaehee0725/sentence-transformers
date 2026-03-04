@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
-from sentence_transformers.base.models.Module import Module
+from sentence_transformers.base.modules.Module import Module
 
 
 class Pooling(Module):

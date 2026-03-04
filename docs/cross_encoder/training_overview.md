@@ -89,7 +89,7 @@ But if instead you want to train from another checkpoint, or from scratch, then 
 
 .. tab:: Decoder / text-generation checkpoints
 
-    CrossEncoder can also wrap text-generation / causal language models whose configs end with ``ForCausalLM``. In this case, it uses a text-generation backbone and adds a :class:`sentence_transformers.cross_encoder.models.CausalScoreHead`, which looks at specific "true" / "false" tokens (for example "yes" and "no" or "1" or "0") and converts the causal logits into a single scalar score per input pair.
+    CrossEncoder can also wrap text-generation / causal language models whose configs end with ``ForCausalLM``. In this case, it uses a text-generation backbone and adds a :class:`sentence_transformers.cross_encoder.modules.CausalScoreHead`, which looks at specific "true" / "false" tokens (for example "yes" and "no" or "1" or "0") and converts the causal logits into a single scalar score per input pair.
 
     .. raw:: html
 
@@ -97,7 +97,7 @@ But if instead you want to train from another checkpoint, or from scratch, then 
             <p class="sidebar-title">Documentation</p>
             <ul class="simple">
                 <li><a class="reference internal" href="../package_reference/cross_encoder/cross_encoder.html#sentence_transformers.cross_encoder.model.CrossEncoder"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.cross_encoder.model.CrossEncoder</span></code></a></li>
-                <li><a class="reference internal" href="../package_reference/cross_encoder/models.html#sentence_transformers.cross_encoder.models.CausalScoreHead"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.cross_encoder.models.CausalScoreHead</span></code></a></li>
+                <li><a class="reference internal" href="../package_reference/cross_encoder/modules.html#sentence_transformers.cross_encoder.modules.CausalScoreHead"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentence_transformers.cross_encoder.modules.CausalScoreHead</span></code></a></li>
             </ul>
         </div>
 

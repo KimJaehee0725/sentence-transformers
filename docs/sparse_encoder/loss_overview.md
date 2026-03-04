@@ -25,7 +25,7 @@ Main losses that use in-batch negatives, primarily <a href="../package_reference
 
 ### CSR Loss
 
-If you are using the <a href="../package_reference/sparse_encoder/models.html#sparseautoencoder"><code>SparseAutoEncoder</code></a> module, then you have to use the <a href="../package_reference/sparse_encoder/losses.html#csrloss"><code>CSRLoss</code></a> (Contrastive Sparse Representation Loss). It combines two components:
+If you are using the <a href="../package_reference/sparse_encoder/modules.html#sparseautoencoder"><code>SparseAutoEncoder</code></a> module, then you have to use the <a href="../package_reference/sparse_encoder/losses.html#csrloss"><code>CSRLoss</code></a> (Contrastive Sparse Representation Loss). It combines two components:
 
 1. Main loss: Supports all the losses from the <a href="#loss-table">Loss Table</a> and <a href="#distillation">Distillation</a>, with <a href="../package_reference/sparse_encoder/losses.html#sparsemultiplenegativesrankingloss"><code>SparseMultipleNegativesRankingLoss</code></a> used in the CSR Paper.
 2. Reconstruction loss: <a href="../package_reference/sparse_encoder/losses.html#csrreconstructionloss"><code>CSRReconstructionLoss</code></a> is used to ensure that sparse representation can faithfully reconstruct the original dense embeddings.

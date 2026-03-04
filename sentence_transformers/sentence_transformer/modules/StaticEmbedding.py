@@ -19,7 +19,7 @@ from tokenizers import Tokenizer
 from torch import nn
 from transformers import PreTrainedTokenizerFast
 
-from sentence_transformers.base.models.InputModule import InputModule
+from sentence_transformers.base.modules.InputModule import InputModule
 from sentence_transformers.util import get_device_name
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ class StaticEmbedding(InputModule):
         Example::
 
             from sentence_transformers import SentenceTransformer
-            from sentence_transformers.sentence_transformer.models import StaticEmbedding
+            from sentence_transformers.modules import StaticEmbedding
             from tokenizers import Tokenizer
 
             # Pre-distilled embeddings:

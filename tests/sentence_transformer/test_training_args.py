@@ -5,7 +5,7 @@ from packaging.version import parse as parse_version
 from transformers import HfArgumentParser
 from transformers import __version__ as transformers_version
 
-from sentence_transformers.base.training_args import BatchSamplers, MultiDatasetBatchSamplers
+from sentence_transformers.base.sampler import BatchSamplers, MultiDatasetBatchSamplers
 from sentence_transformers.sentence_transformer.training_args import SentenceTransformerTrainingArguments
 
 

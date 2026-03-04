@@ -17,15 +17,14 @@ from transformers import (
 from transformers.utils.deprecation import deprecate_kwarg
 
 from sentence_transformers.base.evaluation import SentenceEvaluator
-from sentence_transformers.base.models import Router
 from sentence_transformers.base.trainer import BaseTrainer
+from sentence_transformers.modules import Pooling, Router
 from sentence_transformers.sentence_transformer.data_collator import SentenceTransformerDataCollator
 from sentence_transformers.sentence_transformer.model import SentenceTransformer
 from sentence_transformers.sentence_transformer.model_card import (
     SentenceTransformerModelCardCallback,
     SentenceTransformerModelCardData,
 )
-from sentence_transformers.sentence_transformer.models import Pooling
 from sentence_transformers.sentence_transformer.training_args import SentenceTransformerTrainingArguments
 from sentence_transformers.util import is_datasets_available
 

@@ -17,10 +17,11 @@ from datetime import datetime
 
 from datasets import load_dataset
 
-from sentence_transformers import SentenceTransformer, losses
-from sentence_transformers.base.trainer import SentenceTransformerTrainer
-from sentence_transformers.base.training_args import BaseTrainingArguments
+from sentence_transformers import SentenceTransformer
 from sentence_transformers.sentence_transformer.evaluation import EmbeddingSimilarityEvaluator
+from sentence_transformers.sentence_transformer.losses import SoftmaxLoss
+from sentence_transformers.sentence_transformer.trainer import SentenceTransformerTrainer
+from sentence_transformers.sentence_transformer.training_args import SentenceTransformerTrainingArguments
 from sentence_transformers.util.similarity import SimilarityFunction
 
 # Set the log level to INFO to get more information
@@ -45,7 +46,7 @@ eval_dataset = load_dataset("sentence-transformers/all-nli", "pair-class", split
 logging.info(train_dataset)
 
 # 3. Define our training loss: https://sbert.net/docs/package_reference/sentence_transformer/losses.html#softmaxloss
-train_loss = losses.SoftmaxLoss(
+train_loss = SoftmaxLoss(
     model=model,
     sentence_embedding_dimension=model.get_sentence_embedding_dimension(),
     num_labels=3,
@@ -64,7 +65,7 @@ logging.info("Evaluation before training:")
 dev_evaluator(model)
 
 # 5. Define the training arguments
-args = BaseTrainingArguments(
+args = SentenceTransformerTrainingArguments(
     # Required parameter:
     output_dir=output_dir,
     # Optional training parameters:

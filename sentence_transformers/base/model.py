@@ -28,8 +28,7 @@ from transformers.dynamic_module_utils import get_class_from_dynamic_module, get
 from sentence_transformers import __version__
 from sentence_transformers.base.evaluation import SentenceEvaluator
 from sentence_transformers.base.model_card import BaseModelCardData, generate_model_card
-from sentence_transformers.base.models import Module, Router, Transformer
-from sentence_transformers.base.models.modality_utils import (
+from sentence_transformers.base.modules.modality_utils import (
     ArrayInputs,
     DictInputs,
     ImageInputs,
@@ -39,6 +38,7 @@ from sentence_transformers.base.models.modality_utils import (
     # infer_modality,
 )
 from sentence_transformers.base.peft_mixin import PeftAdapterMixin
+from sentence_transformers.modules import Module, Router, Transformer
 from sentence_transformers.util import (
     get_device_name,
     import_from_string,
@@ -1046,7 +1046,7 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
         Load a module class from a class reference string.
 
         Args:
-            class_ref: The class reference string (e.g., "sentence_transformers.sentence_transformer.models.Pooling")
+            class_ref: The class reference string (e.g., "sentence_transformers.sentence_transformer.modules.Pooling")
             model_name_or_path: The model name or path
             trust_remote_code: Whether to trust remote code
             revision: The model revision

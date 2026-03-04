@@ -12,9 +12,9 @@ except ImportError:
 from torch import Tensor, nn
 from transformers.utils import logging
 
-from sentence_transformers.base.models.InputModule import InputModule
-from sentence_transformers.base.models.modality_utils import MODALITY_TO_PROCESSOR_ARG, Modality  # , infer_modality
-from sentence_transformers.base.models.Module import Module
+from sentence_transformers.base.modules.InputModule import InputModule
+from sentence_transformers.base.modules.modality_utils import MODALITY_TO_PROCESSOR_ARG, Modality  # , infer_modality
+from sentence_transformers.base.modules.Module import Module
 from sentence_transformers.util import import_from_string, load_dir_path
 
 logger = logging.get_logger(__name__)
@@ -68,7 +68,7 @@ class Router(InputModule):
             ::
 
                 from sentence_transformers import SentenceTransformer
-                from sentence_transformers.base.models import Router, Normalize
+                from sentence_transformers.modules import Router, Normalize
 
                 # Use a regular SentenceTransformer for the document embeddings, and a static embedding model for the query embeddings
                 document_embedder = SentenceTransformer("mixedbread-ai/mxbai-embed-large-v1")
@@ -92,9 +92,9 @@ class Router(InputModule):
 
             ::
 
-                from sentence_transformers.base.models import Router, Transformer
+                from sentence_transformers.modules import Router, Transformer
                 from sentence_transformers.sparse_encoder import SparseEncoder
-                from sentence_transformers.sparse_encoder.models import SparseStaticEmbedding, SpladePooling
+                from sentence_transformers.modules import SparseStaticEmbedding, SpladePooling
 
                 # Load an asymmetric model with different encoders for queries and documents
                 doc_encoder = Transformer("opensearch-project/opensearch-neural-sparse-encoding-doc-v3-distill", transformer_task="fill-mask")
@@ -153,7 +153,7 @@ class Router(InputModule):
 
                 from PIL import Image
                 from sentence_transformers import SentenceTransformer
-                from sentence_transformers.sentence_transformer.models import Dense, Pooling, Router, Transformer
+                from sentence_transformers.modules import Dense, Pooling, Router, Transformer
 
                 # Create separate encoders for different modalities
                 text_encoder = Transformer("sentence-transformers/all-MiniLM-L6-v2")
@@ -193,7 +193,7 @@ class Router(InputModule):
             ::
 
                 from sentence_transformers import SentenceTransformer
-                from sentence_transformers.base.models import Router
+                from sentence_transformers.modules import Router
 
                 # Different encoders for query text, document text, and images
                 router = Router(
@@ -218,7 +218,7 @@ class Router(InputModule):
 
         .. note::
 
-            When training models with the :class:`~sentence_transformers.base.models.Router` module, you must use the
+            When training models with the :class:`~sentence_transformers.base.modules.Router` module, you must use the
             ``router_mapping`` argument in the :class:`~sentence_transformers.sentence_transformer.training_args.SentenceTransformerTrainingArguments`
             or :class:`~sentence_transformers.sparse_encoder.training_args.SparseEncoderTrainingArguments` to map the
             training dataset columns to the correct route ("query" or "document"). For example, if your training dataset(s)

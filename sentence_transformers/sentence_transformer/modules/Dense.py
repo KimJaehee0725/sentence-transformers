@@ -9,7 +9,7 @@ except ImportError:
 
 from torch import Tensor, nn
 
-from sentence_transformers.base.models.Module import Module
+from sentence_transformers.base.modules.Module import Module
 from sentence_transformers.util import fullname, import_from_string
 
 

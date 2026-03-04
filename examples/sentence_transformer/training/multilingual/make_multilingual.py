@@ -25,8 +25,6 @@ import numpy as np
 from datasets import DatasetDict, load_dataset
 
 from sentence_transformers import LoggingHandler, SentenceTransformer
-from sentence_transformers.base.trainer import SentenceTransformerTrainer
-from sentence_transformers.base.training_args import BaseTrainingArguments
 from sentence_transformers.sentence_transformer.evaluation import (
     EmbeddingSimilarityEvaluator,
     MSEEvaluator,
@@ -34,6 +32,8 @@ from sentence_transformers.sentence_transformer.evaluation import (
     TranslationEvaluator,
 )
 from sentence_transformers.sentence_transformer.losses import MSELoss
+from sentence_transformers.sentence_transformer.trainer import SentenceTransformerTrainer
+from sentence_transformers.sentence_transformer.training_args import SentenceTransformerTrainingArguments
 
 logging.basicConfig(
     format="%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO, handlers=[LoggingHandler()]
@@ -196,7 +196,7 @@ evaluator = SequentialEvaluator(evaluators, main_score_function=lambda scores: n
 eval_dataset_dict = eval_dataset_dict.map(prepare_dataset, batched=True, batch_size=30000, remove_columns=column_names)
 
 # 5. Define the training arguments
-args = BaseTrainingArguments(
+args = SentenceTransformerTrainingArguments(
     # Required parameter:
     output_dir=output_dir,
     # Optional training parameters:

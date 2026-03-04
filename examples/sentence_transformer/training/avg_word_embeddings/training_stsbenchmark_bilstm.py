@@ -11,10 +11,12 @@ from datetime import datetime
 
 from datasets import load_dataset
 
-from sentence_transformers import SentenceTransformer, losses, models
-from sentence_transformers.base.trainer import SentenceTransformerTrainer
-from sentence_transformers.base.training_args import BaseTrainingArguments
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.modules import LSTM, Pooling, WordEmbeddings
 from sentence_transformers.sentence_transformer.evaluation import EmbeddingSimilarityEvaluator
+from sentence_transformers.sentence_transformer.losses import CosineSimilarityLoss
+from sentence_transformers.sentence_transformer.trainer import SentenceTransformerTrainer
+from sentence_transformers.sentence_transformer.training_args import SentenceTransformerTrainingArguments
 from sentence_transformers.util.similarity import SimilarityFunction
 
 # Set the log level to INFO to get more information
@@ -32,12 +34,12 @@ logging.info(train_dataset)
 
 # 2. Define the model
 # Map tokens to traditional word embeddings like GloVe
-word_embedding_model = models.WordEmbeddings.from_text_file("glove.6B.300d.txt.gz")
+word_embedding_model = WordEmbeddings.from_text_file("glove.6B.300d.txt.gz")
 
-lstm = models.LSTM(word_embedding_dimension=word_embedding_model.get_word_embedding_dimension(), hidden_dim=1024)
+lstm = LSTM(word_embedding_dimension=word_embedding_model.get_word_embedding_dimension(), hidden_dim=1024)
 
 # Apply mean pooling to get one fixed sized sentence vector
-pooling_model = models.Pooling(
+pooling_model = Pooling(
     lstm.get_word_embedding_dimension(),
     pooling_mode="mean",
 )
@@ -46,7 +48,7 @@ model = SentenceTransformer(modules=[word_embedding_model, lstm, pooling_model])
 # 3. Define our training loss
 # CosineSimilarityLoss (https://sbert.net/docs/package_reference/sentence_transformer/losses.html#cosinesimilarityloss) needs two text columns and
 # one similarity score column (between 0 and 1)
-train_loss = losses.CosineSimilarityLoss(model=model)
+train_loss = CosineSimilarityLoss(model=model)
 
 # 4. Define an evaluator for use during training. This is useful to keep track of alongside the evaluation loss.
 dev_evaluator = EmbeddingSimilarityEvaluator(
@@ -58,7 +60,7 @@ dev_evaluator = EmbeddingSimilarityEvaluator(
 )
 
 # 5. Define the training arguments
-args = BaseTrainingArguments(
+args = SentenceTransformerTrainingArguments(
     # Required parameter:
     output_dir=output_dir,
     # Optional training parameters:

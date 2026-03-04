@@ -6,7 +6,7 @@ from typing import Literal
 import torch
 from torch import Tensor
 
-from sentence_transformers.base.models.InputModule import InputModule
+from sentence_transformers.base.modules.InputModule import InputModule
 
 from .tokenizer import WhitespaceTokenizer
 

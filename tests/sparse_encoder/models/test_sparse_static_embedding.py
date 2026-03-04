@@ -5,7 +5,7 @@ from pathlib import Path
 import torch
 
 from sentence_transformers import SparseEncoder
-from sentence_transformers.sparse_encoder.models import SparseStaticEmbedding
+from sentence_transformers.modules import SparseStaticEmbedding
 from tests.sparse_encoder.utils import sparse_allclose
 
 

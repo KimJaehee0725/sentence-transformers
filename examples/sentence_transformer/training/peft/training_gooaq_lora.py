@@ -6,12 +6,12 @@ from datasets import Dataset, load_dataset
 from peft import LoraConfig, TaskType
 
 from sentence_transformers import (
-    BaseModelCardData,
-    BaseTrainingArguments,
     SentenceTransformer,
+    SentenceTransformerModelCardData,
     SentenceTransformerTrainer,
+    SentenceTransformerTrainingArguments,
 )
-from sentence_transformers.base.training_args import BatchSamplers
+from sentence_transformers.base.sampler import BatchSamplers
 from sentence_transformers.sentence_transformer.evaluation import NanoBEIREvaluator
 from sentence_transformers.sentence_transformer.losses import CachedMultipleNegativesRankingLoss
 
@@ -25,7 +25,7 @@ model_name_only = model_name.split("/")[-1]
 # 1. Load a model to finetune with 2. (Optional) model card data
 model = SentenceTransformer(
     model_name,
-    model_card_data=BaseModelCardData(
+    model_card_data=SentenceTransformerModelCardData(
         language="en",
         license="apache-2.0",
         model_name=f"{model_name_only} adapter finetuned on GooAQ pairs",
@@ -53,7 +53,7 @@ loss = CachedMultipleNegativesRankingLoss(model, mini_batch_size=32)
 
 # 5. (Optional) Specify training arguments
 run_name = f"{model_name_only}-gooaq-peft"
-args = BaseTrainingArguments(
+args = SentenceTransformerTrainingArguments(
     # Required parameter:
     output_dir=f"models/{run_name}",
     # Optional training parameters:

@@ -21,7 +21,7 @@ import pytest
 import torch
 from PIL import Image
 
-from sentence_transformers.base.models import Transformer
+from sentence_transformers.modules import Transformer
 from sentence_transformers.util.tensor import batch_to_device
 from tests.utils import is_ci
 

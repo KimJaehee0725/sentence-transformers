@@ -8,11 +8,12 @@ from datetime import datetime
 import tqdm
 from datasets import Dataset, load_dataset
 
-from sentence_transformers import SentenceTransformer, models
-from sentence_transformers.base.trainer import SentenceTransformerTrainer
-from sentence_transformers.base.training_args import BaseTrainingArguments
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.modules import Pooling, Transformer
 from sentence_transformers.sentence_transformer.evaluation import EmbeddingSimilarityEvaluator
 from sentence_transformers.sentence_transformer.losses import DenoisingAutoEncoderLoss
+from sentence_transformers.sentence_transformer.trainer import SentenceTransformerTrainer
+from sentence_transformers.sentence_transformer.training_args import SentenceTransformerTrainingArguments
 from sentence_transformers.util.similarity import SimilarityFunction
 
 # Set the log level to INFO to get more information
@@ -27,8 +28,8 @@ max_seq_length = 75
 output_dir = f"output/training_tsdae-{model_name.replace('/', '-')}-{train_batch_size}-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
 
 # 1. Defining our sentence transformer model
-word_embedding_model = models.Transformer(model_name, max_seq_length=max_seq_length)
-pooling_model = models.Pooling(word_embedding_model.get_word_embedding_dimension(), "cls")
+word_embedding_model = Transformer(model_name, max_seq_length=max_seq_length)
+pooling_model = Pooling(word_embedding_model.get_word_embedding_dimension(), "cls")
 model = SentenceTransformer(modules=[word_embedding_model, pooling_model])
 # or to load a pre-trained SentenceTransformer model OR use mean pooling
 # model = SentenceTransformer(model_name)
@@ -131,7 +132,7 @@ logging.info("Evaluation before training:")
 dev_evaluator(model)
 
 # 5. Define the training arguments
-args = BaseTrainingArguments(
+args = SentenceTransformerTrainingArguments(
     # Required parameter:
     output_dir=output_dir,
     # Optional training parameters:

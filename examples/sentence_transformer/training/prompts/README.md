@@ -90,7 +90,7 @@ Since the v3.3.0 Sentence Transformers release, it's possible to finetune embedd
         ...,
     )
 
-Additionally, some research papers (`INSTRUCTOR <https://huggingface.co/papers/2212.09741>`_, `NV-Embed <https://huggingface.co/papers/2405.17428>`_) exclude the prompt from the mean pooling step, such that it's only used in the Transformer blocks. In Sentence Transformers, this can be configured with the ``include_prompt`` argument/attribute in the :class:`~sentence_transformers.sentence_transformer.models.Pooling` module or via the :meth:`SentenceTransformer.set_pooling_include_prompt() <sentence_transformers.sentence_transformer.model.SentenceTransformer.set_pooling_include_prompt>` method. In my personal experience, models that include the prompt in the pooling tend to perform better.
+Additionally, some research papers (`INSTRUCTOR <https://huggingface.co/papers/2212.09741>`_, `NV-Embed <https://huggingface.co/papers/2405.17428>`_) exclude the prompt from the mean pooling step, such that it's only used in the Transformer blocks. In Sentence Transformers, this can be configured with the ``include_prompt`` argument/attribute in the :class:`~sentence_transformers.sentence_transformer.modules.Pooling` module or via the :meth:`SentenceTransformer.set_pooling_include_prompt() <sentence_transformers.sentence_transformer.model.SentenceTransformer.set_pooling_include_prompt>` method. In my personal experience, models that include the prompt in the pooling tend to perform better.
 ```
 
 ### Training Script

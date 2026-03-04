@@ -37,13 +37,14 @@ from datasets import Dataset, concatenate_datasets, load_dataset
 from elasticsearch import Elasticsearch
 from torch.utils.data import DataLoader
 
-from sentence_transformers import SentenceTransformer, losses
-from sentence_transformers.base.trainer import SentenceTransformerTrainer
-from sentence_transformers.base.training_args import BaseTrainingArguments
+from sentence_transformers import SentenceTransformer
 from sentence_transformers.cross_encoder import CrossEncoder
 from sentence_transformers.cross_encoder.evaluation import CrossEncoderCorrelationEvaluator
 from sentence_transformers.sentence_transformer.evaluation import EmbeddingSimilarityEvaluator
+from sentence_transformers.sentence_transformer.losses import CosineSimilarityLoss
 from sentence_transformers.sentence_transformer.readers import InputExample
+from sentence_transformers.sentence_transformer.trainer import SentenceTransformerTrainer
+from sentence_transformers.sentence_transformer.training_args import SentenceTransformerTrainingArguments
 from sentence_transformers.util.similarity import SimilarityFunction
 
 # Set the log level to INFO to get more information
@@ -201,7 +202,7 @@ silver_samples = Dataset.from_dict(
 )
 train_dataset = concatenate_datasets([train_dataset, silver_samples])
 
-train_loss = losses.CosineSimilarityLoss(model=sentence_transformer)
+train_loss = CosineSimilarityLoss(model=sentence_transformer)
 
 logging.info("Read STSbenchmark dev dataset")
 evaluator = EmbeddingSimilarityEvaluator(
@@ -213,7 +214,7 @@ evaluator = EmbeddingSimilarityEvaluator(
 )
 
 # Define the training arguments
-args = BaseTrainingArguments(
+args = SentenceTransformerTrainingArguments(
     # Required parameter:
     output_dir=sentence_transformer_path,
     # Optional training parameters:

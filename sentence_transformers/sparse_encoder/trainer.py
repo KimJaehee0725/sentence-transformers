@@ -16,10 +16,9 @@ from transformers import (
 )
 from transformers.utils.deprecation import deprecate_kwarg
 
-from sentence_transformers.base.models import Router
 from sentence_transformers.base.trainer import BaseTrainer
+from sentence_transformers.modules import Pooling, Router
 from sentence_transformers.sentence_transformer.evaluation import SentenceEvaluator
-from sentence_transformers.sentence_transformer.models import Pooling
 from sentence_transformers.sparse_encoder.callbacks.splade_callbacks import SpladeRegularizerWeightSchedulerCallback
 from sentence_transformers.sparse_encoder.data_collator import SparseEncoderDataCollator
 from sentence_transformers.sparse_encoder.losses import SparseMultipleNegativesRankingLoss, SpladeLoss

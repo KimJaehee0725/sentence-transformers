@@ -16,7 +16,7 @@ import torch
 from torch import nn
 from tqdm import tqdm
 
-from sentence_transformers.base.models.Module import Module
+from sentence_transformers.base.modules.Module import Module
 from sentence_transformers.util import fullname, http_get, import_from_string
 
 from .tokenizer import TransformersTokenizerWrapper, WhitespaceTokenizer, WordTokenizer

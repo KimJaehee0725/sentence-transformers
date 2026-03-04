@@ -8,8 +8,8 @@ from torch import Tensor, nn
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 from transformers import __version__ as transformers_version
 
+from sentence_transformers.modules import StaticEmbedding
 from sentence_transformers.sentence_transformer.model import SentenceTransformer
-from sentence_transformers.sentence_transformer.models import StaticEmbedding
 
 logger = logging.getLogger(__name__)
 

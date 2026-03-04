@@ -8,12 +8,12 @@ import torch
 from datasets import Dataset, load_dataset
 
 from sentence_transformers import (
-    BaseModelCardData,
-    BaseTrainingArguments,
     SentenceTransformer,
+    SentenceTransformerModelCardData,
     SentenceTransformerTrainer,
+    SentenceTransformerTrainingArguments,
 )
-from sentence_transformers.base.training_args import BatchSamplers
+from sentence_transformers.base.sampler import BatchSamplers
 from sentence_transformers.sentence_transformer.evaluation import NanoBEIREvaluator
 from sentence_transformers.sentence_transformer.losses import CachedMultipleNegativesRankingLoss
 
@@ -29,7 +29,7 @@ include_prompts_in_pooling = True
 # 1. Load a model to finetune with 2. (Optional) model card data
 model = SentenceTransformer(
     "microsoft/mpnet-base",
-    model_card_data=BaseModelCardData(
+    model_card_data=SentenceTransformerModelCardData(
         language="en",
         license="apache-2.0",
         model_name="MPNet base trained on Natural Questions pairs",
@@ -61,7 +61,7 @@ if use_prompts:
     run_name += "-prompts"
 if not include_prompts_in_pooling:
     run_name += "-exclude-pooling-prompts"
-args = BaseTrainingArguments(
+args = SentenceTransformerTrainingArguments(
     # Required parameter:
     output_dir=f"models/{run_name}",
     # Optional training parameters:

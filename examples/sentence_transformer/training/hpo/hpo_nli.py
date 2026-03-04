@@ -1,13 +1,13 @@
 from datasets import load_dataset
 
 from sentence_transformers import (
-    BaseTrainingArguments,
     SentenceTransformer,
     SentenceTransformerTrainer,
-    losses,
+    SentenceTransformerTrainingArguments,
 )
-from sentence_transformers.base.training_args import BatchSamplers
+from sentence_transformers.base.sampler import BatchSamplers
 from sentence_transformers.sentence_transformer.evaluation import EmbeddingSimilarityEvaluator, SimilarityFunction
+from sentence_transformers.sentence_transformer.losses import MultipleNegativesRankingLoss
 
 # 1. Load the AllNLI dataset: https://huggingface.co/datasets/sentence-transformers/all-nli, 10k samples
 train_dataset = load_dataset("sentence-transformers/all-nli", "triplet", split="train[:10000]")
@@ -41,7 +41,7 @@ def hpo_model_init(trial):
 
 # 5. Define the Loss Initialization
 def hpo_loss_init(model):
-    return losses.MultipleNegativesRankingLoss(model)
+    return MultipleNegativesRankingLoss(model)
 
 
 # 6. Define the Objective Function
@@ -59,7 +59,7 @@ def hpo_compute_objective(metrics):
 
 
 # 7. Define the training arguments
-args = BaseTrainingArguments(
+args = SentenceTransformerTrainingArguments(
     # Required parameter:
     output_dir="checkpoints",
     # Optional training parameters:

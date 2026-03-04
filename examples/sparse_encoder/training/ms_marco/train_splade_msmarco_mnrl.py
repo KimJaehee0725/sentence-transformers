@@ -18,7 +18,7 @@ from sentence_transformers import (
     SparseEncoderTrainer,
     SparseEncoderTrainingArguments,
 )
-from sentence_transformers.base.training_args import BatchSamplers
+from sentence_transformers.base.sampler import BatchSamplers
 from sentence_transformers.sparse_encoder import evaluation, losses
 
 # Set the log level to INFO to get more information

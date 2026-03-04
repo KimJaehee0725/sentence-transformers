@@ -10,7 +10,7 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 
 from sentence_transformers import SentenceTransformer
-from sentence_transformers.base.models import Transformer
+from sentence_transformers.modules import Transformer
 from sentence_transformers.sentence_transformer.losses.CachedGISTEmbedLoss import CachedGISTEmbedLoss
 from sentence_transformers.sentence_transformer.losses.CachedMultipleNegativesRankingLoss import (
     CachedMultipleNegativesRankingLoss,

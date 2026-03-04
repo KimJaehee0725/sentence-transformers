@@ -17,10 +17,14 @@ from datetime import datetime
 
 from datasets import load_dataset
 
-from sentence_transformers import SentenceTransformer, losses
-from sentence_transformers.base.trainer import SentenceTransformerTrainer
-from sentence_transformers.base.training_args import BaseTrainingArguments, BatchSamplers
+from sentence_transformers import SentenceTransformer
 from sentence_transformers.sentence_transformer.evaluation import EmbeddingSimilarityEvaluator
+from sentence_transformers.sentence_transformer.losses import MultipleNegativesRankingLoss
+from sentence_transformers.sentence_transformer.trainer import SentenceTransformerTrainer
+from sentence_transformers.sentence_transformer.training_args import (
+    BatchSamplers,
+    SentenceTransformerTrainingArguments,
+)
 from sentence_transformers.util.similarity import SimilarityFunction
 
 # Set the log level to INFO to get more information
@@ -49,7 +53,7 @@ eval_dataset = load_dataset("sentence-transformers/all-nli", "triplet", split="d
 logging.info(train_dataset)
 
 # 3. Define our training loss: https://sbert.net/docs/package_reference/sentence_transformer/losses.html#multiplenegativesrankingloss
-train_loss = losses.MultipleNegativesRankingLoss(model)
+train_loss = MultipleNegativesRankingLoss(model)
 
 
 # 4. Define an evaluator for use during training. This is useful to keep track of alongside the evaluation loss.
@@ -65,7 +69,7 @@ logging.info("Evaluation before training:")
 dev_evaluator(model)
 
 # 5. Define the training arguments
-args = BaseTrainingArguments(
+args = SentenceTransformerTrainingArguments(
     # Required parameter:
     output_dir=output_dir,
     # Optional training parameters:

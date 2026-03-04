@@ -16,8 +16,7 @@ import time
 from datasets import load_dataset
 
 from sentence_transformers import SparseEncoder
-from sentence_transformers.base.models import Router, Transformer
-from sentence_transformers.sparse_encoder.models import SparseStaticEmbedding, SpladePooling
+from sentence_transformers.modules import Router, SparseStaticEmbedding, SpladePooling, Transformer
 from sentence_transformers.sparse_encoder.search_engines import semantic_search_opensearch
 
 # 1. Load the natural-questions dataset with 100K answers

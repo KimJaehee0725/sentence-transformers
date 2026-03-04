@@ -7,8 +7,7 @@ import torch
 from typing_extensions import deprecated
 
 from sentence_transformers.base.model_card import BaseModelCardCallback, BaseModelCardData
-from sentence_transformers.base.models import Router
-from sentence_transformers.sentence_transformer.models import StaticEmbedding
+from sentence_transformers.modules import Router, StaticEmbedding
 
 
 class SentenceTransformerModelCardCallback(BaseModelCardCallback):

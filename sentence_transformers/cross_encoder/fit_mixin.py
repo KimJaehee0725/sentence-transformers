@@ -17,7 +17,7 @@ from transformers import TrainerCallback, TrainerControl, TrainerState, is_torch
 from transformers.tokenization_utils_base import BatchEncoding
 
 from sentence_transformers.base.evaluation.SentenceEvaluator import SentenceEvaluator
-from sentence_transformers.base.training_args import BatchSamplers
+from sentence_transformers.base.sampler import BatchSamplers
 from sentence_transformers.cross_encoder.training_args import CrossEncoderTrainingArguments
 from sentence_transformers.sentence_transformer.datasets.NoDuplicatesDataLoader import NoDuplicatesDataLoader
 from sentence_transformers.sentence_transformer.datasets.SentenceLabelDataset import SentenceLabelDataset

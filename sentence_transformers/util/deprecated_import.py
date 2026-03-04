@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import sys
 
+# Map old to new module paths for deprecated imports
 DEPRECATED_MODULE_PATHS = {
     # Moved in Sentence Transformers v5.4.0
     "sentence_transformers.SentenceTransformer": "sentence_transformers.sentence_transformer.model",
@@ -63,29 +64,29 @@ DEPRECATED_MODULE_PATHS = {
     "sentence_transformers.losses.OnlineContrastiveLoss": "sentence_transformers.sentence_transformer.losses.OnlineContrastiveLoss",
     "sentence_transformers.losses.SoftmaxLoss": "sentence_transformers.sentence_transformer.losses.SoftmaxLoss",
     "sentence_transformers.losses.TripletLoss": "sentence_transformers.sentence_transformer.losses.TripletLoss",
-    "sentence_transformers.models": "sentence_transformers.sentence_transformer.models",
-    "sentence_transformers.models.Asym": "sentence_transformers.base.models.Router",
-    "sentence_transformers.models.BoW": "sentence_transformers.sentence_transformer.models.BoW",
-    "sentence_transformers.models.CLIPModel": "sentence_transformers.sentence_transformer.models.CLIPModel",
-    "sentence_transformers.models.CNN": "sentence_transformers.sentence_transformer.models.CNN",
-    "sentence_transformers.models.Dense": "sentence_transformers.sentence_transformer.models.Dense",
-    "sentence_transformers.models.Dropout": "sentence_transformers.sentence_transformer.models.Dropout",
-    "sentence_transformers.models.InputModule": "sentence_transformers.base.models.InputModule",
-    "sentence_transformers.models.LSTM": "sentence_transformers.sentence_transformer.models.LSTM",
-    "sentence_transformers.models.LayerNorm": "sentence_transformers.sentence_transformer.models.LayerNorm",
-    "sentence_transformers.models.Module": "sentence_transformers.base.models.Module",
-    "sentence_transformers.models.Normalize": "sentence_transformers.sentence_transformer.models.Normalize",
-    "sentence_transformers.models.Pooling": "sentence_transformers.sentence_transformer.models.Pooling",
-    "sentence_transformers.models.Router": "sentence_transformers.base.models.Router",
-    "sentence_transformers.models.StaticEmbedding": "sentence_transformers.sentence_transformer.models.StaticEmbedding",
-    "sentence_transformers.models.Transformer": "sentence_transformers.base.models.Transformer",
-    "sentence_transformers.models.WeightedLayerPooling": "sentence_transformers.sentence_transformer.models.WeightedLayerPooling",
-    "sentence_transformers.models.WordEmbeddings": "sentence_transformers.sentence_transformer.models.WordEmbeddings",
-    "sentence_transformers.models.WordWeights": "sentence_transformers.sentence_transformer.models.WordWeights",
-    "sentence_transformers.models.tokenizer": "sentence_transformers.sentence_transformer.models.tokenizer",
-    "sentence_transformers.models.tokenizer.PhraseTokenizer": "sentence_transformers.sentence_transformer.models.tokenizer.PhraseTokenizer",
-    "sentence_transformers.models.tokenizer.WhitespaceTokenizer": "sentence_transformers.sentence_transformer.models.tokenizer.WhitespaceTokenizer",
-    "sentence_transformers.models.tokenizer.WordTokenizer": "sentence_transformers.sentence_transformer.models.tokenizer.WordTokenizer",
+    "sentence_transformers.models": "sentence_transformers.sentence_transformer.modules",
+    "sentence_transformers.models.Asym": "sentence_transformers.base.modules.Router",
+    "sentence_transformers.models.BoW": "sentence_transformers.sentence_transformer.modules.BoW",
+    "sentence_transformers.models.CLIPModel": "sentence_transformers.sentence_transformer.modules.CLIPModel",
+    "sentence_transformers.models.CNN": "sentence_transformers.sentence_transformer.modules.CNN",
+    "sentence_transformers.models.Dense": "sentence_transformers.sentence_transformer.modules.Dense",
+    "sentence_transformers.models.Dropout": "sentence_transformers.sentence_transformer.modules.Dropout",
+    "sentence_transformers.models.InputModule": "sentence_transformers.base.modules.InputModule",
+    "sentence_transformers.models.LSTM": "sentence_transformers.sentence_transformer.modules.LSTM",
+    "sentence_transformers.models.LayerNorm": "sentence_transformers.sentence_transformer.modules.LayerNorm",
+    "sentence_transformers.models.Module": "sentence_transformers.base.modules.Module",
+    "sentence_transformers.models.Normalize": "sentence_transformers.sentence_transformer.modules.Normalize",
+    "sentence_transformers.models.Pooling": "sentence_transformers.sentence_transformer.modules.Pooling",
+    "sentence_transformers.models.Router": "sentence_transformers.base.modules.Router",
+    "sentence_transformers.models.StaticEmbedding": "sentence_transformers.sentence_transformer.modules.StaticEmbedding",
+    "sentence_transformers.models.Transformer": "sentence_transformers.base.modules.Transformer",
+    "sentence_transformers.models.WeightedLayerPooling": "sentence_transformers.sentence_transformer.modules.WeightedLayerPooling",
+    "sentence_transformers.models.WordEmbeddings": "sentence_transformers.sentence_transformer.modules.WordEmbeddings",
+    "sentence_transformers.models.WordWeights": "sentence_transformers.sentence_transformer.modules.WordWeights",
+    "sentence_transformers.models.tokenizer": "sentence_transformers.sentence_transformer.modules.tokenizer",
+    "sentence_transformers.models.tokenizer.PhraseTokenizer": "sentence_transformers.sentence_transformer.modules.tokenizer.PhraseTokenizer",
+    "sentence_transformers.models.tokenizer.WhitespaceTokenizer": "sentence_transformers.sentence_transformer.modules.tokenizer.WhitespaceTokenizer",
+    "sentence_transformers.models.tokenizer.WordTokenizer": "sentence_transformers.sentence_transformer.modules.tokenizer.WordTokenizer",
     "sentence_transformers.readers": "sentence_transformers.sentence_transformer.readers",
     "sentence_transformers.readers.InputExample": "sentence_transformers.sentence_transformer.readers.InputExample",
     "sentence_transformers.readers.LabelSentenceReader": "sentence_transformers.sentence_transformer.readers.LabelSentenceReader",
@@ -93,6 +94,11 @@ DEPRECATED_MODULE_PATHS = {
     "sentence_transformers.readers.NLIDataReader": "sentence_transformers.sentence_transformer.readers.NLIDataReader",
     "sentence_transformers.readers.STSDataReader": "sentence_transformers.sentence_transformer.readers.STSDataReader",
     "sentence_transformers.readers.TripletReader": "sentence_transformers.sentence_transformer.readers.TripletReader",
+    "sentence_transformers.sparse_encoder.models": "sentence_transformers.sparse_encoder.modules",
+    "sentence_transformers.sparse_encoder.models.MLMTransformer": "sentence_transformers.sparse_encoder.modules.MLMTransformer",
+    "sentence_transformers.sparse_encoder.models.SparseAutoEncoder": "sentence_transformers.sparse_encoder.modules.SparseAutoEncoder",
+    "sentence_transformers.sparse_encoder.models.SparseStaticEmbedding": "sentence_transformers.sparse_encoder.modules.SparseStaticEmbedding",
+    "sentence_transformers.sparse_encoder.models.SpladePooling": "sentence_transformers.sparse_encoder.modules.SpladePooling",
     # Deprecated in Sentence Transformers v4.0.0
     "sentence_transformers.cross_encoder.evaluation.CEBinaryAccuracyEvaluator": "sentence_transformers.cross_encoder.evaluation.deprecated",
     "sentence_transformers.cross_encoder.evaluation.CEBinaryClassificationEvaluator": "sentence_transformers.cross_encoder.evaluation.deprecated",
@@ -103,8 +109,8 @@ DEPRECATED_MODULE_PATHS = {
     # Deprecated in Sentence Transformers TODO
     # TODO: Perhaps import Asym/Router etc. in sentence_transformers/sentence_transformer/models/__init__.py to allow
     # for importing from sentence_transformers.sentence_transformer.models etc.?
-    "sentence_transformers.sentence_transformer.models.Asym": "sentence_transformers.base.models.Router",
-    "sentence_transformers.sentence_transformer.models.Router": "sentence_transformers.base.models.Router",
+    "sentence_transformers.sentence_transformer.modules.Asym": "sentence_transformers.base.modules.Router",
+    "sentence_transformers.sentence_transformer.modules.Router": "sentence_transformers.base.modules.Router",
 }
 
 
@@ -116,10 +122,6 @@ def setup_deprecated_module_imports() -> None:
     for old_path, new_path in DEPRECATED_MODULE_PATHS.items():
         # Import the new module if not already imported
         if new_path not in sys.modules:
-            try:
-                importlib.import_module(new_path)
-            except ImportError:
-                # If the new module doesn't exist, skip it
-                continue
+            importlib.import_module(new_path)
 
         sys.modules[old_path] = sys.modules[new_path]

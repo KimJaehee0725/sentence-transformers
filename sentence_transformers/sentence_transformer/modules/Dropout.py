@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from torch import Tensor, nn
 
-from sentence_transformers.base.models.Module import Module
+from sentence_transformers.base.modules.Module import Module
 
 
 class Dropout(Module):

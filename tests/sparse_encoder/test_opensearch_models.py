@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import torch
 
-from sentence_transformers.base.models import Router, Transformer
+from sentence_transformers.modules import Router, SparseStaticEmbedding, SpladePooling, Transformer
 from sentence_transformers.sparse_encoder import SparseEncoder
-from sentence_transformers.sparse_encoder.models import SparseStaticEmbedding, SpladePooling
 
 
 def test_opensearch_v2_distill_similarity():

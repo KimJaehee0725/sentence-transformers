@@ -23,15 +23,15 @@ from transformers import (
 from typing_extensions import deprecated
 
 from sentence_transformers.base.model import BaseModel
-from sentence_transformers.base.models import Transformer
-from sentence_transformers.base.models.modality_utils import PairStrInputs
+from sentence_transformers.base.modules.modality_utils import PairStrInputs
 from sentence_transformers.cross_encoder.fit_mixin import FitMixin
 from sentence_transformers.cross_encoder.model_card import CrossEncoderModelCardData
-from sentence_transformers.cross_encoder.models.CausalScoreHead import CausalScoreHead
+from sentence_transformers.cross_encoder.modules.CausalScoreHead import CausalScoreHead
 from sentence_transformers.cross_encoder.util import (
     cross_encoder_init_args_decorator,
     cross_encoder_predict_rank_args_decorator,
 )
+from sentence_transformers.modules import Transformer
 from sentence_transformers.util import batch_to_device, fullname, import_from_string
 
 logger = logging.getLogger(__name__)

@@ -10,4 +10,4 @@ Sentence Transformer
    losses
    evaluation
    datasets
-   models
+   modules

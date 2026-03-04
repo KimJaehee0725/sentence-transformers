@@ -22,19 +22,15 @@ from datetime import datetime
 
 from datasets import load_dataset
 
-from sentence_transformers import (
-    BaseTrainingArguments,
-    SentenceTransformer,
-    SentenceTransformerTrainer,
-    losses,
-    models,
-)
-from sentence_transformers.base.training_args import BatchSamplers
+from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer, SentenceTransformerTrainingArguments
+from sentence_transformers.base.sampler import BatchSamplers
+from sentence_transformers.modules import Dense
 from sentence_transformers.sentence_transformer.evaluation import (
     EmbeddingSimilarityEvaluator,
     SequentialEvaluator,
     SimilarityFunction,
 )
+from sentence_transformers.sentence_transformer.losses import MatryoshkaLoss, MultipleNegativesRankingLoss
 
 # Set the log level to INFO to get more information
 logging.basicConfig(format="%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
@@ -54,9 +50,7 @@ output_dir = (
 # create one with "mean" pooling.
 model = SentenceTransformer(model_name)
 # dense = models.Dense(in_features=pooling_model.get_sentence_embedding_dimension(), out_features=reduced_dim)
-model.add_module(
-    "reduced_dim", models.Dense(in_features=model.get_sentence_embedding_dimension(), out_features=reduced_dim)
-)
+model.add_module("reduced_dim", Dense(in_features=model.get_sentence_embedding_dimension(), out_features=reduced_dim))
 # If we want, we can limit the maximum sequence length for the model
 # model.max_seq_length = 75
 logging.info(model)
@@ -70,8 +64,8 @@ logging.info(train_dataset)
 # train_dataset = train_dataset.select(range(5000))
 
 # 3. Define our training loss
-inner_train_loss = losses.MultipleNegativesRankingLoss(model)
-train_loss = losses.MatryoshkaLoss(model, inner_train_loss, matryoshka_dims=matryoshka_dims)
+inner_train_loss = MultipleNegativesRankingLoss(model)
+train_loss = MatryoshkaLoss(model, inner_train_loss, matryoshka_dims=matryoshka_dims)
 
 # 4. Define an evaluator for use during training. This is useful to keep track of alongside the evaluation loss.
 stsb_eval_dataset = load_dataset("sentence-transformers/stsb", split="validation")
@@ -90,7 +84,7 @@ for dim in matryoshka_dims:
 dev_evaluator = SequentialEvaluator(evaluators, main_score_function=lambda scores: scores[0])
 
 # 5. Define the training arguments
-args = BaseTrainingArguments(
+args = SentenceTransformerTrainingArguments(
     # Required parameter:
     output_dir=output_dir,
     # Optional training parameters:

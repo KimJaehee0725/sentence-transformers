@@ -8,9 +8,9 @@ from unsloth import FastSentenceTransformer, is_bf16_supported
 from sentence_transformers.sentence_transformer import (
     SentenceTransformerTrainer,
     SentenceTransformerTrainingArguments,
-    losses,
 )
 from sentence_transformers.sentence_transformer.evaluation import InformationRetrievalEvaluator
+from sentence_transformers.sentence_transformer.losses import MultipleNegativesRankingLoss
 from sentence_transformers.sentence_transformer.training_args import BatchSamplers
 
 # 1. Load a base model to finetune using FastSentenceTransformer
@@ -68,7 +68,7 @@ evaluator(model)
 
 # 5. Define a loss function
 # This will use other positives in the same batch as negative examples
-loss = losses.MultipleNegativesRankingLoss(model)
+loss = MultipleNegativesRankingLoss(model)
 
 # 6. Define training arguments
 run_name = "embeddinggemma-300m-miriad-unsloth"

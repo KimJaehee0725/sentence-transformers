@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from ...base.models.InputModule import InputModule
-from ...base.models.Module import Module
-from ...base.models.Router import Asym, Router
-from ...base.models.Transformer import Transformer
+from ...base.modules.InputModule import InputModule
+from ...base.modules.Module import Module
+from ...base.modules.Router import Asym, Router
+from ...base.modules.Transformer import Transformer
 from .BoW import BoW
 from .CLIPModel import CLIPModel
 from .CNN import CNN

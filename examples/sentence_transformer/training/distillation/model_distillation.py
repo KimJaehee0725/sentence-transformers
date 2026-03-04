@@ -29,10 +29,12 @@ import torch
 from datasets import Dataset, concatenate_datasets, load_dataset
 from sklearn.decomposition import PCA
 
-from sentence_transformers import LoggingHandler, SentenceTransformer, evaluation, losses, models
-from sentence_transformers.base.trainer import SentenceTransformerTrainer
-from sentence_transformers.base.training_args import BaseTrainingArguments
+from sentence_transformers import LoggingHandler, SentenceTransformer, evaluation
+from sentence_transformers.modules import Dense
 from sentence_transformers.sentence_transformer.evaluation import EmbeddingSimilarityEvaluator
+from sentence_transformers.sentence_transformer.losses import MSELoss
+from sentence_transformers.sentence_transformer.trainer import SentenceTransformerTrainer
+from sentence_transformers.sentence_transformer.training_args import SentenceTransformerTrainingArguments
 from sentence_transformers.util.similarity import SimilarityFunction
 
 #### Just some code to print debug information to stdout
@@ -128,7 +130,7 @@ if student_model.get_sentence_embedding_dimension() < teacher_model.get_sentence
     pca.fit(pca_embeddings)
 
     # Add Dense layer to teacher that projects the embeddings down to the student embedding size
-    dense = models.Dense(
+    dense = Dense(
         in_features=teacher_model.get_sentence_embedding_dimension(),
         out_features=student_model.get_sentence_embedding_dimension(),
         bias=False,
@@ -161,7 +163,7 @@ train_dataset.save_to_disk("datasets/distillation_train_dataset")
 #     train_dataset = train_dataset["train"]
 eval_dataset = eval_dataset.map(map_embeddings, batched=True, batch_size=50000)
 
-train_loss = losses.MSELoss(model=student_model)
+train_loss = MSELoss(model=student_model)
 
 # We create an evaluator, that measure the Mean Squared Error (MSE) between the teacher and the student embeddings
 eval_sentences = eval_dataset["sentence"]
@@ -169,7 +171,7 @@ dev_evaluator_mse = evaluation.MSEEvaluator(eval_sentences, eval_sentences, teac
 dev_evaluator = evaluation.SequentialEvaluator([dev_evaluator_stsb, dev_evaluator_mse])
 
 # Define the training arguments
-args = BaseTrainingArguments(
+args = SentenceTransformerTrainingArguments(
     # Required parameter:
     output_dir=output_dir,
     # Optional training parameters:

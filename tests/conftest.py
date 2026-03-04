@@ -9,8 +9,7 @@ import pytest
 from tokenizers import Tokenizer
 
 from sentence_transformers import CrossEncoder, SentenceTransformer, SparseEncoder
-from sentence_transformers.base.models import Transformer
-from sentence_transformers.sentence_transformer.models import Pooling, StaticEmbedding
+from sentence_transformers.modules import Pooling, StaticEmbedding, Transformer
 from sentence_transformers.util import is_datasets_available
 
 if is_datasets_available():

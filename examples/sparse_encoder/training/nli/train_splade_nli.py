@@ -20,7 +20,7 @@ from sentence_transformers import (
     SparseEncoderTrainer,
     SparseEncoderTrainingArguments,
 )
-from sentence_transformers.base.training_args import BatchSamplers
+from sentence_transformers.base.sampler import BatchSamplers
 from sentence_transformers.sparse_encoder import evaluation, losses
 from sentence_transformers.util.similarity import SimilarityFunction
 

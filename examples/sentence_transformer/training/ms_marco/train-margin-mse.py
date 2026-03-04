@@ -6,10 +6,10 @@ import torch
 from datasets import load_dataset
 
 from sentence_transformers import (
-    BaseModelCardData,
-    BaseTrainingArguments,
     SentenceTransformer,
+    SentenceTransformerModelCardData,
     SentenceTransformerTrainer,
+    SentenceTransformerTrainingArguments,
 )
 from sentence_transformers.sentence_transformer.evaluation import (
     InformationRetrievalEvaluator,
@@ -28,7 +28,7 @@ def main():
     # 1. Load a model to finetune with 2. (Optional) model card data
     model = SentenceTransformer(
         "microsoft/mpnet-base",
-        model_card_data=BaseModelCardData(
+        model_card_data=SentenceTransformerModelCardData(
             language="en",
             license="apache-2.0",
             model_name="mpnet-base finetuned on MSMARCO via distillation",
@@ -47,7 +47,7 @@ def main():
 
     # 5. (Optional) Specify training arguments
     run_name = "mpnet-base-msmarco-margin-mse"
-    args = BaseTrainingArguments(
+    args = SentenceTransformerTrainingArguments(
         # Required parameter:
         output_dir=f"models/{run_name}",
         # Optional training parameters:

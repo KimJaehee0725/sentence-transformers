@@ -12,8 +12,8 @@ from torch import Tensor, nn
 from torch.utils.checkpoint import get_device_states, set_device_states
 
 from sentence_transformers import util
+from sentence_transformers.modules import StaticEmbedding
 from sentence_transformers.sentence_transformer.model import SentenceTransformer
-from sentence_transformers.sentence_transformer.models import StaticEmbedding
 from sentence_transformers.util import all_gather_with_grad
 
 logger = logging.getLogger(__name__)

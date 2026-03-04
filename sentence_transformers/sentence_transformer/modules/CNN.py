@@ -8,7 +8,7 @@ except ImportError:
 import torch
 from torch import nn
 
-from sentence_transformers.base.models.Module import Module
+from sentence_transformers.base.modules.Module import Module
 
 
 class CNN(Module):
