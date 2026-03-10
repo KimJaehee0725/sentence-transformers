@@ -21,7 +21,7 @@ import torch.multiprocessing as mp
 import transformers
 from huggingface_hub import CardData, HfApi
 from packaging import version
-from torch import Tensor, device, nn
+from torch import Tensor, nn
 from transformers import PreTrainedModel, is_datasets_available, is_torch_npu_available
 from transformers.dynamic_module_utils import get_class_from_dynamic_module, get_relative_import_files
 
@@ -1144,7 +1144,7 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
                 module.gradient_checkpointing_enable(gradient_checkpointing_kwargs)
 
     @property
-    def device(self) -> device:
+    def device(self) -> torch.device:
         """
         Get torch.device from module, assuming that the whole module has one device.
         In case there are no PyTorch parameters, fall back to CPU.
