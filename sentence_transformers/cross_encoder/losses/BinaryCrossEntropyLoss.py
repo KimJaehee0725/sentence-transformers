@@ -109,7 +109,7 @@ class BinaryCrossEntropyLoss(nn.Module):
         breakpoint()
         logits = self.model(**tokens)[0].view(-1)
         """
-        # NOTE: I don't think I can preserve backwards compatibility: the `self.model` call just has different
+        # TODO: I don't think I can preserve backwards compatibility: the `self.model` call just has different
         # tokenizer (manageable), inputs (manageable), and outputs (not manageable) now.
         tokens = self.model.preprocess(pairs)
         tokens.to(self.model.device)

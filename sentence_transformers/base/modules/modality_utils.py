@@ -463,19 +463,23 @@ def infer_modality(sample: SingleInput | PairInput | Any) -> Modality:
             return "message"
         case list() if sample and isinstance(sample[0], dict) and "role" in sample[0] and "content" in sample[0]:
             return "message"
-        case dict() if "array" in sample and "sampling_rate" in sample:
+        case dict() if (
+            "array" in sample and "sampling_rate" in sample
+        ):  # TODO: What if 'array' without sampling_rate? Can we use the array ndim?
             return "audio"
-        case dict() if "array" in sample and "video_metadata" in sample:
+        case dict() if (
+            "array" in sample and "video_metadata" in sample
+        ):  # TODO: What if 'array' without video_metadata? Can we use the array ndim?
             return "video"
         case dict():
             # Multimodal dict: keys are modality names (sorted for consistent route lookups)
             return tuple(sorted(sample.keys()))
         case np.ndarray() | torch.Tensor():
-            if sample.ndim in (1, 2):
+            if sample.ndim in (1, 2):  # TODO: Is this right?
                 return "audio"
             elif sample.ndim == 3:
                 return "image"
-            elif sample.ndim in (4, 5):
+            elif sample.ndim in (4, 5):  # TODO: Is this right?
                 return "video"
             else:
                 raise ValueError(
