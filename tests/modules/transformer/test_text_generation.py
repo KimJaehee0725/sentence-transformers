@@ -199,7 +199,7 @@ class TestTextGenerationArchitectures:
                 if arch in EXPECT_FORWARD_FAIL and EXPECT_FORWARD_FAIL[arch] is None:
                     context = pytest.raises(Exception)
                 expected_fail = EXPECT_FORWARD_FAIL_PAIRS.get(arch, False)
-                if expected_fail is None or (expected_fail is not None and pair_desc in expected_fail):
+                if expected_fail is None or (expected_fail and pair_desc in expected_fail):
                     context = pytest.raises(Exception)
 
                 with context:
