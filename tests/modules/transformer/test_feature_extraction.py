@@ -8,6 +8,8 @@ and tests various input modalities (text, image, audio, video, message).
 from __future__ import annotations
 
 from contextlib import nullcontext
+from itertools import combinations
+from typing import get_args
 
 import pytest
 import torch
@@ -15,6 +17,8 @@ from packaging.version import Version
 from transformers import __version__ as transformers_version
 from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
 
+from sentence_transformers.base.model import BaseModel
+from sentence_transformers.base.modules.modality_utils import Modality
 from sentence_transformers.modules import Transformer
 from sentence_transformers.util.tensor import batch_to_device
 
@@ -104,6 +108,54 @@ class TestTransformerArchitectures:
         arch, model, modalities = arch_model_modalities
         assert isinstance(modalities, list)
         assert len(modalities) > 0
+
+    def test_supports_consistency(self, arch_model_modalities, subtests):
+        """Test that supports() is consistent with the modalities property.
+
+        For each architecture, verifies that:
+        1. Each listed modality is supported.
+        2. Unlisted single modalities are not supported.
+        3. Tuple modalities composed of listed parts are supported iff "message" is also listed.
+        4. Tuple modalities with unlisted parts are never supported.
+        """
+        arch, model, modalities = arch_model_modalities
+        has_message = "message" in modalities
+        non_message = [m for m in modalities if isinstance(m, str) and m != "message"]
+        all_single: list[Modality] = list(get_args(get_args(Modality)[0]))
+
+        for modality in modalities:
+            with subtests.test(msg=f"{modality} listed => supported"):
+                assert BaseModel.supports(model, modality)
+
+        for modality in all_single:
+            if modality not in modalities:
+                with subtests.test(msg=f"{modality} unlisted => not supported"):
+                    assert not BaseModel.supports(model, modality)
+
+        # Test tuple modalities composed of listed non-message parts
+        if len(non_message) >= 2:
+            for combo in combinations(non_message, 2):
+                with subtests.test(msg=f"{combo} tuple => {'supported' if has_message else 'not supported'}"):
+                    if has_message:
+                        assert BaseModel.supports(model, combo)
+                    else:
+                        # Without message, tuple is only supported if explicitly listed
+                        assert BaseModel.supports(model, combo) == (combo in modalities)
+
+        # Test tuple with a truly unlisted part is never supported.
+        # A modality is "truly unlisted" if it doesn't appear as a single modality,
+        # nor as a part of any explicit tuple modality in the modalities list.
+        all_parts = set()
+        for m in modalities:
+            if isinstance(m, tuple):
+                all_parts.update(m)
+            elif m != "message":
+                all_parts.add(m)
+        truly_unlisted = [m for m in all_single if m not in all_parts]
+        if non_message and truly_unlisted:
+            bad_tuple = (non_message[0], truly_unlisted[0])
+            with subtests.test(msg=f"{bad_tuple} with unlisted part => not supported"):
+                assert not BaseModel.supports(model, bad_tuple)
 
     def test_inference_with_supported_modalities(self, arch_model_modalities, subtests):
         """Test inference with each supported modality (single and multi-modal)."""

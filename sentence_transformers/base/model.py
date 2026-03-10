@@ -197,6 +197,38 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
         """Return the list of modalities supported by this model."""
         return getattr(self[0], "modalities", ["text"])
 
+    def supports(self, modality: Modality) -> bool:
+        """Check if the model supports the given modality.
+
+        A modality is supported if:
+        1. It is directly listed in :attr:`modalities`, or
+        2. It is a tuple of modalities whose individual parts are all in :attr:`modalities`
+           **and** ``"message"`` is in :attr:`modalities` (since the model uses message format
+           to combine multiple modalities).
+
+        Args:
+            modality: A single modality string (e.g. ``"text"``, ``"image"``) or a tuple
+                of modality strings (e.g. ``("image", "text")``).
+
+        Returns:
+            bool: Whether the model supports the given modality.
+
+        Example::
+
+            >>> from sentence_transformers import SentenceTransformer
+            >>> model = SentenceTransformer("all-MiniLM-L6-v2")
+            >>> model.supports("text")
+            True
+            >>> model.supports("image")
+            False
+        """
+        supported = self.modalities
+        if modality in supported:
+            return True
+        if isinstance(modality, tuple) and "message" in supported:
+            return all(part in supported for part in modality)
+        return False
+
     def get_model_kwargs(self) -> list[str]:
         """
         Get the keyword arguments specific to this model for the `encode`, `encode_query`, or `encode_document` methods.
@@ -307,11 +339,10 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
             except (ValueError, TypeError):
                 pass
             else:
-                supported_modalities = self.modalities
-                if modality not in supported_modalities and "message" not in supported_modalities:
+                if not self.supports(modality):
                     raise ValueError(
                         f"Modality '{modality}' is not supported by {type(self[0]).__name__}. "
-                        f"Supported modalities: {supported_modalities}"
+                        f"Supported modalities: {self.modalities}"
                     )
 
         # Backwards compatibility: fall back to preprocess/tokenize without prompt if the
