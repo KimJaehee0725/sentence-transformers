@@ -7,12 +7,9 @@ from tokenizers import Tokenizer
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 from sentence_transformers.base.modules.modality_utils import (
-    ArrayInputs,
-    DictInputs,
-    ImageInputs,
     Modality,
-    PairStrInputs,
-    StrInputs,
+    PairInput,
+    SingleInput,
 )
 from sentence_transformers.base.modules.Module import Module
 
@@ -76,7 +73,7 @@ class InputModule(Module):
 
     def preprocess(
         self,
-        inputs: list[StrInputs | PairStrInputs | DictInputs | ImageInputs | ArrayInputs],
+        inputs: list[SingleInput | PairInput],
         prompt: str | None = None,
         **kwargs,
     ) -> dict[str, torch.Tensor | Any]:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from collections import defaultdict
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal, TypeAlias, TypedDict
 from urllib.parse import urlparse
 
 import numpy as np
@@ -18,11 +18,34 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-PairStrInputs: TypeAlias = tuple[str, str] | list[str]
-StrInputs: TypeAlias = str
-DictInputs: TypeAlias = dict[str, Any]
-ImageInputs: TypeAlias = Image
-ArrayInputs: TypeAlias = np.ndarray | torch.Tensor
+
+class AudioDict(TypedDict):
+    array: np.ndarray | torch.Tensor
+    sampling_rate: int
+
+
+class VideoDict(TypedDict):
+    array: np.ndarray | torch.Tensor
+    video_metadata: dict[str, Any]
+
+
+class MessageDict(TypedDict):
+    role: str
+    content: str | list[dict[str, Any]]
+
+
+TextInput: TypeAlias = str
+ImageInput: TypeAlias = str | Image | np.ndarray | torch.Tensor
+AudioInput: TypeAlias = str | np.ndarray | torch.Tensor | AudioDict
+VideoInput: TypeAlias = str | np.ndarray | torch.Tensor | VideoDict
+MessageInput: TypeAlias = MessageDict | list[MessageDict]
+MultimodalInput: TypeAlias = dict[
+    Literal["text", "image", "audio", "video"], TextInput | ImageInput | AudioInput | VideoInput
+]
+SingleInput: TypeAlias = TextInput | ImageInput | AudioInput | VideoInput | MessageInput | MultimodalInput
+
+PairableInput: TypeAlias = TextInput | ImageInput | AudioInput | VideoInput
+PairInput: TypeAlias = tuple[PairableInput, PairableInput] | list[PairableInput]
 
 Modality: TypeAlias = (
     Literal["text", "image", "audio", "video", "message"] | tuple[Literal["text", "image", "audio", "video"], ...]
@@ -72,6 +95,27 @@ def is_video_url_or_path(text: str) -> bool:
 def is_audio_url_or_path(text: str) -> bool:
     """Check if a string is an audio URL or file path."""
     return _is_media_url_or_path(text, (".mp3", ".wav", ".ogg", ".flac", ".aac"))
+
+
+def _is_non_text_pair(sample: Any) -> bool:
+    """Check if a sample is a non-text pair (2-element tuple/list with at least one non-string element).
+
+    Text pairs ``(str, str)`` are handled natively by tokenizers and detected as ``"text"`` modality
+    by :func:`infer_modality`. This helper detects pairs that contain at least one non-string element
+    (e.g. an image, audio array, or dict), which require conversion to message format.
+    """
+    if not isinstance(sample, (tuple, list)) or len(sample) != 2:
+        return False
+    # Text pairs are handled by infer_modality as "text"
+    if isinstance(sample[0], str) and isinstance(sample[1], str):
+        return False
+    # Exclude message dicts (role+content) and list-of-message-dicts
+    for elem in sample:
+        if isinstance(elem, dict) and "role" in elem and "content" in elem:
+            return False
+        if isinstance(elem, list) and elem and isinstance(elem[0], dict):
+            return False
+    return True
 
 
 class InputFormatter:
@@ -142,7 +186,7 @@ class InputFormatter:
 
     def parse_inputs(
         self,
-        inputs: list[StrInputs | PairStrInputs | DictInputs | ImageInputs | ArrayInputs],
+        inputs: list[SingleInput | PairInput],
     ) -> tuple[Modality, dict[str, list], defaultdict[str, dict[str, Any]]]:
         """Parse inputs and group by modality.
 
@@ -150,10 +194,14 @@ class InputFormatter:
         and groups them appropriately for the processor. Handles mixed modalities by converting
         to message format when necessary.
 
+        Non-text pairs (e.g. ``(image, text)`` or ``(image, image)``) are detected and converted
+        to message format with ``"query"``/``"document"`` roles via :meth:`pair_to_messages`.
+
         Args:
             inputs: List of inputs to parse. Can be:
                 - str: Text inputs
                 - tuple/list of str: Text pairs (for cross-encoders)
+                - tuple/list of mixed types: Non-text pairs (e.g. image + text)
                 - dict: Chat messages, audio data, or multimodal inputs
                 - PIL.Image.Image: Image inputs
                 - np.ndarray/torch.Tensor: Audio (1-2D) or video (3-5D) inputs
@@ -167,11 +215,18 @@ class InputFormatter:
         if not inputs:
             return "text", {"text": []}, defaultdict(dict)
 
-        typed_inputs: list[tuple[Modality, Any]] = []
+        typed_inputs: list[tuple[Modality | Literal["pair"], Any]] = []
         extra_modality_kwargs = defaultdict(dict)
+        has_pairs = False
 
         for item in inputs:
-            modality = infer_modality(item)
+            # Detect non-text pairs before calling infer_modality (which would raise for them)
+            if _is_non_text_pair(item):
+                typed_inputs.append(("pair", item))
+                has_pairs = True
+                continue
+
+            modality = infer_modality(item)  # type: ignore[arg-type]  # non-text pairs filtered above
 
             # For dict-wrapped audio/video, unwrap the array and collect extra kwargs.
             # For a single message dict, wrap it in a list. All other values pass through as-is.
@@ -187,6 +242,16 @@ class InputFormatter:
                 value = item
 
             typed_inputs.append((modality, value))
+
+        # Non-text pairs require conversion to message format
+        if has_pairs:
+            messages = []
+            for mod, value in typed_inputs:
+                if mod == "pair":
+                    messages.append(self.pair_to_messages(value))
+                else:
+                    messages.append(self.to_messages({mod: value}))  # type: ignore[dict-item]
+            return "message", {"message": messages}, extra_modality_kwargs
 
         modalities, processed_inputs = zip(*typed_inputs)
         processed_inputs = list(processed_inputs)
@@ -205,52 +270,55 @@ class InputFormatter:
 
         return modality, processed_inputs, extra_modality_kwargs
 
+    def pair_to_messages(self, pair: tuple | list) -> list[dict[str, Any]]:
+        """Convert a pair of inputs to query/document message format.
+
+        Each element of the pair is wrapped in a message with role ``"query"`` (first element)
+        or ``"document"`` (second element). The modality of each element is inferred individually
+        via :func:`infer_modality`.
+
+        Args:
+            pair: A 2-element tuple or list of inputs (e.g. ``(image, text)``).
+
+        Returns:
+            List of two message dictionaries with ``"query"`` and ``"document"`` roles.
+        """
+        query_item, doc_item = pair
+        query_modality = infer_modality(query_item)
+        doc_modality = infer_modality(doc_item)
+
+        if self.message_format == "flat":
+            return [
+                {"role": "query", "content": query_item},
+                {"role": "document", "content": doc_item},
+            ]
+        return [
+            {"role": "query", "content": [{"type": query_modality, query_modality: query_item}]},
+            {"role": "document", "content": [{"type": doc_modality, doc_modality: doc_item}]},
+        ]
+
     def to_messages(self, typed_input: dict[Modality, Any], role: str = "user") -> list[dict[str, Any]]:
         """Convert a typed input dictionary to message format.
 
-        For single values, produces a single message with the given ``role``.
-        For pair inputs (tuple/list), produces ``"query"`` and ``"document"`` messages
-        — the ``role`` parameter is ignored in that case.
+        Produces a single message with the given ``role``. For pair/multi-value inputs,
+        use :meth:`pair_to_messages` instead (which is called automatically by :meth:`parse_inputs`).
 
         Args:
-            typed_input: Dictionary mapping modality to input value.
-            role: Role for the message (default: ``"user"``). Only used for single-value inputs.
+            typed_input: Dictionary mapping modality to input value (single value per modality).
+            role: Role for the message (default: ``"user"``).
 
         Returns:
-            List of message dictionaries.
+            List of message dictionaries (single message).
         """
         if self.message_format == "flat":
             if len(typed_input) == 1:
                 _, value = next(iter(typed_input.items()))
-                if isinstance(value, (tuple, list)):
-                    return [{"role": "query", "content": value[0]}] + [
-                        {"role": "document", "content": value_element} for value_element in value[1:]
-                    ]
                 return [{"role": role, "content": value}]
             else:
                 logger.warning(
                     "Flat message format requested but multiple modalities detected. "
                     "Falling back to structured format."
                 )
-
-        # Structured format
-        has_multi_input = any(isinstance(value, (tuple, list)) for value in typed_input.values())
-        if has_multi_input:
-            output = []
-            for modality, value in typed_input.items():
-                if not isinstance(value, (tuple, list)):
-                    value = [value]
-                output.append(
-                    {
-                        "role": "query",
-                        "content": [{"type": modality, modality: value[0]}],
-                    }
-                )
-                output += [
-                    {"role": "document", "content": [{"type": modality, modality: value_element}]}
-                    for value_element in value[1:]
-                ]
-            return output
 
         return [
             {"role": role, "content": [{"type": modality, modality: value} for modality, value in typed_input.items()]}
@@ -270,7 +338,16 @@ class InputFormatter:
         """
         modalities = (modality,) if isinstance(modality, str) else modality
         batch_size = len(next(iter(processor_inputs.values())))
-        messages = [self.to_messages({mod: processor_inputs[mod][i] for mod in modalities}) for i in range(batch_size)]
+        messages = []
+        for i in range(batch_size):
+            typed_input = {mod: processor_inputs[mod][i] for mod in modalities}
+            # Text pairs (e.g. ("query", "document")) are routed to pair_to_messages instead
+            if len(typed_input) == 1:
+                value = next(iter(typed_input.values()))
+                if isinstance(value, (tuple, list)) and len(value) == 2 and all(isinstance(v, str) for v in value):
+                    messages.append(self.pair_to_messages(value))
+                    continue
+            messages.append(self.to_messages(typed_input))  # type: ignore[arg-type]
         return "message", {"message": messages}
 
     def normalize_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -355,7 +432,7 @@ class InputFormatter:
         return result
 
 
-def infer_modality(sample: StrInputs | PairStrInputs | DictInputs | ImageInputs | ArrayInputs) -> Modality:
+def infer_modality(sample: SingleInput | PairInput | Any) -> Modality:
     """Infer the modality of a single input sample by inspecting its type/structure.
 
     Pure type-based detection — does not require a processor or tokenizer.
@@ -413,7 +490,7 @@ def infer_modality(sample: StrInputs | PairStrInputs | DictInputs | ImageInputs 
 
 
 def infer_batch_modality(
-    samples: list[StrInputs | PairStrInputs | DictInputs | ImageInputs | ArrayInputs],
+    samples: list[SingleInput | PairInput],
 ) -> Modality:
     """Infer the modality of a batch of input samples.
 

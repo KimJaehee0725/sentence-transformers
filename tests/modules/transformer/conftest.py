@@ -1,9 +1,4 @@
-"""
-Test suite for Transformer module with various tiny model architectures.
-This module tests the Transformer module with pre-built tiny models from
-hf-internal-testing and tiny-random organizations on the Hugging Face Hub,
-and tests various input modalities (text, image, audio, video, message).
-"""
+"""Shared fixtures, constants, and sample generators for Transformer task tests."""
 
 from __future__ import annotations
 
@@ -11,7 +6,6 @@ import json
 import random
 import tempfile
 import urllib.request
-from contextlib import nullcontext
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -19,13 +13,9 @@ from typing import Any
 import numpy as np
 import pytest
 import torch
-from packaging.version import Version
 from PIL import Image
-from transformers import __version__ as transformers_version
-from transformers.models.auto.modeling_auto import MODEL_MAPPING_NAMES
 
 from sentence_transformers.modules import Transformer
-from sentence_transformers.util.tensor import batch_to_device
 from tests.utils import is_ci
 
 try:
@@ -131,7 +121,6 @@ EXPECT_FORWARD_FAIL = {
     "mistral3": None,  # Checkpoint input embedding size is 32k, but tokenizer vocab size is 125k+
     "roc_bert": None,  # Checkpoint shape_embed size is 99, but input_shape_ids is up to 20k+
     "qwen3_next": None,  # Checkpoint config has 2 num_hidden_layers, both linear_attention, but the Qwen3NextDynamicCache requires at least one full_attention layer
-    "reformer": None,  # Outputs last_hidden_state with 2 * hidden_size dimensionality as it concats the same tensor for reversible ResNet, low prio
     "tapas": None,  # Doesn't accept standard truncation strategies, needs TapasTruncationStrategy, low prio
     "align": [  # Checkpoint image_processor size/crop_size set to 600, doesn't align with num layers, etc., low prio
         "image (url)",
@@ -393,6 +382,73 @@ def get_sample_messages(
     return messages_list
 
 
+def get_sample_text_pairs(n: int = 2) -> dict[str, list[tuple[str, str]]]:
+    """Generate sample text pair data for cross-encoder style testing."""
+    return {
+        "text_pair": [(f"Query {i}", f"Document {i}") for i in range(n)],
+    }
+
+
+def create_modality_pair_samples(model: Transformer, modalities: list[str], n: int = 2) -> dict[str, list[tuple]]:
+    """Create test pair samples for all supported modality combinations.
+
+    Generates pairs for:
+    1. Text pairs: (text, text) - handled natively by the tokenizer
+    2. Cross-modality pairs: (modality_a, modality_b) for each combination of non-message modalities
+       These are converted to message format with query/document roles.
+    3. Same-modality pairs: (modality, modality) for each non-text modality
+
+    Uses the first format variant for each modality to keep the number of test cases manageable.
+
+    Args:
+        model: The Transformer model instance
+        modalities: List of supported modalities (e.g., ["text", "image", "message"])
+        n: Number of pair samples to generate for each combination
+
+    Returns:
+        Dict mapping pair_description to list of pair tuples where:
+        - pair_description: Human-readable string like "text+text pair", "image+text pair (pil, text)", etc.
+        - pairs: List of (query, document) tuples
+    """
+    from itertools import product
+
+    samples = {}
+    non_message_modalities = [m for m in modalities if m != "message" and isinstance(m, str)]
+
+    # 1. Text pairs (always test if text is supported)
+    if "text" in non_message_modalities:
+        text_pairs = get_sample_text_pairs(n)["text_pair"]
+        samples["text+text pair"] = text_pairs
+
+    # 2. Cross-modality and same-modality pairs (require message support)
+    has_message_support = "message" in modalities
+    if has_message_support:
+        # Get first format variant for each modality
+        modality_samples: dict[str, tuple[str, list]] = {}
+        for mod in non_message_modalities:
+            generator = MODALITY_SAMPLE_GENERATORS.get(mod)
+            if not generator:
+                continue
+            format_variants = generator(n)
+            first_format_name, first_format_inputs = next(iter(format_variants.items()))
+            modality_samples[mod] = (first_format_name, first_format_inputs)
+
+        # Generate all ordered pairs (including same-modality)
+        mods_with_samples = list(modality_samples.keys())
+        for mod_a, mod_b in product(mods_with_samples, repeat=2):
+            # Skip text+text as it's already handled above (natively by tokenizer)
+            if mod_a == "text" and mod_b == "text":
+                continue
+
+            fmt_a, inputs_a = modality_samples[mod_a]
+            fmt_b, inputs_b = modality_samples[mod_b]
+            pairs = list(zip(inputs_a, inputs_b))
+            desc = f"{mod_a}+{mod_b} pair ({fmt_a}, {fmt_b})"
+            samples[desc] = pairs
+
+    return samples
+
+
 # Mapping of modality keys to sample data generators
 # Note: Each generator returns a dict of format_name -> list of samples
 MODALITY_SAMPLE_GENERATORS = {
@@ -550,27 +606,12 @@ def create_modality_samples(
     return samples
 
 
-@pytest.fixture(
-    params=[
-        key
-        for key, value in TINY_MODEL_MAPPING.items()
-        if value is not None
-        and key not in XFAIL_ARCHITECTURES
-        and (key not in TRANSFORMERS_V4_XFAIL_ARCHITECTURES or Version(transformers_version) >= Version("5.0.0"))
-        and key not in FAULTY_CHECKPOINTS
-        and key in MODEL_MAPPING_NAMES  # Ignore unsupported architectures if we're testing with an older transformers
-    ],
-    scope="session",
-)
-def arch(request):
-    """Get the model architecture name."""
-    return request.param
+def get_arch_kwargs(arch: str, transformer_task: str) -> tuple[dict, dict, dict]:
+    """Get model_kwargs, config_kwargs, processor_kwargs for a given architecture.
 
-
-@pytest.fixture(scope="session")
-def arch_model(arch):
-    # Load the model for the first time
-    model_name = TINY_MODEL_MAPPING[arch]
+    Returns:
+        Tuple of (model_kwargs, config_kwargs, processor_kwargs)
+    """
     model_kwargs = {"ignore_mismatched_sizes": True}
     config_kwargs = {}
     processor_kwargs = {}
@@ -590,151 +631,61 @@ def arch_model(arch):
     if arch == "idefics":
         processor_kwargs["additional_special_tokens"] = []
     if arch == "marian":
-        # The existing pad_token is at idx 58100, while an embedding vector was reduced to 99
-        # <unk> is at idx 1
         config_kwargs["pad_token_id"] = 1
     if arch == "qwen2_5_vl":
-        # Only the text and image hidden sizes were updated, the main one was still 2048
         config_kwargs["hidden_size"] = 16
+    if arch == "reformer" and transformer_task == "text-generation":
+        config_kwargs["is_decoder"] = True
+
+    return model_kwargs, config_kwargs, processor_kwargs
+
+
+def load_transformer(arch: str, transformer_task: str = "feature-extraction", **extra_kwargs) -> Transformer:
+    """Load a Transformer model for the given architecture and task.
+
+    Args:
+        arch: Architecture name from TINY_MODEL_MAPPING
+        transformer_task: The transformer task (feature-extraction, sequence-classification, text-generation)
+        **extra_kwargs: Extra kwargs passed to Transformer()
+
+    Returns:
+        Loaded Transformer model
+    """
+    model_name = TINY_MODEL_MAPPING[arch]
+    model_kwargs, config_kwargs, processor_kwargs = get_arch_kwargs(arch, transformer_task)
 
     try:
         model = Transformer(
             model_name,
+            transformer_task=transformer_task,
             model_kwargs={**model_kwargs, "local_files_only": True},
             config_kwargs={**config_kwargs, "local_files_only": True},
             processor_kwargs={**processor_kwargs, "local_files_only": True},
+            **extra_kwargs,
         )
     except Exception:
         model = Transformer(
-            model_name, model_kwargs=model_kwargs, config_kwargs=config_kwargs, processor_kwargs=processor_kwargs
+            model_name,
+            transformer_task=transformer_task,
+            model_kwargs=model_kwargs,
+            config_kwargs=config_kwargs,
+            processor_kwargs=processor_kwargs,
+            **extra_kwargs,
         )
 
     if model.tokenizer:
         # Ensure pad_token_id and eos_token_id are set to avoid issues during testing
-        model.tokenizer.pad_token_id = model.tokenizer.eos_token_id = 0
+        if model.tokenizer.pad_token_id is None:
+            model.tokenizer.pad_token_id = 0
+        if model.tokenizer.eos_token_id is None:
+            model.tokenizer.eos_token_id = 0
+        if model.config.pad_token_id is None:
+            model.config.pad_token_id = 0
+        if model.config.eos_token_id is None:
+            model.config.eos_token_id = 0
 
-    return arch, model
+    # Required for saving llama models to disk
+    if transformer_task == "text-generation" and model.model.generation_config.pad_token_id == -1:
+        model.model.generation_config.pad_token_id = model.model.generation_config.eos_token_id
 
-
-@pytest.fixture
-def arch_model_modalities(arch_model):
-    """Create a Transformer instance and return it with its supported modalities.
-
-    Returns:
-        tuple: (model, supported_modalities_list)
-    """
-    try:
-        arch, model = arch_model
-        modalities = model.modalities
-        return arch, model, modalities
-    except Exception as e:
-        pytest.fail(f"Failed to get modalities: {e}")
-
-
-class TestTransformerArchitectures:
-    """Test suite for Transformer module with various tiny model architectures."""
-
-    def test_get_embedding_dimension(self, arch_model):
-        """Test that word embedding dimension can be retrieved."""
-        arch, model = arch_model
-        dim = model.get_embedding_dimension()
-        assert isinstance(dim, int)
-        assert dim > 0
-
-    def test_save_load(self, arch_model, tmp_path):
-        """Test saving and loading the model."""
-        arch, model = arch_model
-
-        save_path = tmp_path / "model"
-        save_path.mkdir(exist_ok=True)
-
-        model.save(str(save_path))
-        loaded_model = Transformer(str(save_path))
-
-        assert loaded_model.get_embedding_dimension() == model.get_embedding_dimension()
-
-    def test_modalities_property(self, arch_model_modalities):
-        """Test that the modalities property returns a list."""
-        arch, model, modalities = arch_model_modalities
-        assert isinstance(modalities, list)
-        assert len(modalities) > 0
-
-    def test_inference_with_supported_modalities(self, arch_model_modalities, subtests):
-        """Test inference with each supported modality (single and multi-modal)."""
-        arch, model, modalities = arch_model_modalities
-        if arch in REQUIRES_CUDA:
-            if not torch.cuda.is_available():
-                pytest.skip(f"{arch} requires CUDA for inference, but CUDA is not available.")
-            else:
-                model = model.to("cuda")
-
-        # Create all valid test samples for the model's supported modalities
-        test_samples = create_modality_samples(
-            model, modalities, n=2, message_format=model.input_formatter.message_format
-        )
-        # test_samples = {modality_desc: inputs for modality_desc, inputs in test_samples.items() if modality_desc == "text"}
-        # test_samples = {modality_desc: inputs for modality_desc, inputs in test_samples.items() if modality_desc == "image"}
-        # test_samples = {modality_desc: inputs for modality_desc, inputs in test_samples.items() if modality_desc == "image+video as message"}
-        # test_samples = {modality_desc: inputs for modality_desc, inputs in test_samples.items() if modality_desc == "video (array)"}
-        # test_samples = {modality_desc: inputs for modality_desc, inputs in test_samples.items() if "video" in modality_desc}
-
-        for modality_desc, inputs in test_samples.items():
-            with subtests.test(msg=f"Testing {modality_desc}"):
-                context = nullcontext()
-                if arch in EXPECT_FORWARD_FAIL and (
-                    EXPECT_FORWARD_FAIL[arch] is None or modality_desc in EXPECT_FORWARD_FAIL[arch]
-                ):
-                    context = pytest.raises(Exception)
-                elif arch in EXPECT_IMAGE_VIDEO_FAILURE and "image" in modality_desc and "video" in modality_desc:
-                    context = pytest.raises((ValueError, TypeError, AttributeError))
-                elif arch in EXPECT_IMAGE_ONLY_FAILURE and "image" in modality_desc and "+" not in modality_desc:
-                    context = pytest.raises((ValueError, TypeError, AttributeError))
-                elif (
-                    model.module_output_name == "sentence_embedding"
-                    and "+" in modality_desc
-                    and arch not in EXPECT_MULTIMODAL_SUCCESS
-                ) or ("+" in modality_desc and arch in EXPECT_MULTIMODAL_FAILURE):
-                    # If a model outputs sentence embeddings directly, that's likely via the get_..._features methods,
-                    # which typically don't support multimodal inputs (except blip), so we can expect a failure in that case
-                    # TODO: Better error for explaining multimodal inputs on models that output sentence embeddings directly
-                    context = pytest.raises(ValueError)
-
-                with context:
-                    # Preprocess the data & forward
-                    try:
-                        features = model.preprocess(inputs)
-                    except ValueError as exc:
-                        if (
-                            "Could not make a flat list of images from" in str(exc)
-                            and "image" in modality_desc
-                            and ("url" in modality_desc or "path" in modality_desc)
-                        ):
-                            pytest.skip(
-                                f"The {arch!r} architecture with an older transformers version doesn't support image URLs, skipping this modality format."
-                            )
-                        raise
-                    except KeyError as exc:
-                        if "'height'" in str(exc) and "image" in modality_desc:
-                            pytest.skip(
-                                f"The {arch!r} architecture with an older transformers version doesn't yet nicely extract the size of image inputs, skipping this modality format."
-                            )
-                        raise
-
-                    if arch in REQUIRES_CUDA:
-                        features = batch_to_device(features, torch.device("cuda"))
-                    with torch.no_grad():
-                        output = model.forward(features)
-
-                    # Verify output has expected keys
-                    assert model.module_output_name in output, (
-                        f"Expected '{model.module_output_name}' in output for {modality_desc}"
-                    )
-
-                    # Verify batch size is correct
-                    output_tensor = output[model.module_output_name]
-                    assert output_tensor.shape[0] == len(inputs), f"Batch size mismatch for {modality_desc}"
-                    assert output_tensor.shape[-1] == model.get_embedding_dimension(), (
-                        f"Embedding dimension mismatch for {modality_desc}"
-                    )
-
-                    # TODO: Add more specific checks on module_output_name vs output_tensor ndims
+    return model

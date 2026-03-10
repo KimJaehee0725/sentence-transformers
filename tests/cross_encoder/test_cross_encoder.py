@@ -442,27 +442,20 @@ def test_init_args_decorator(
     ["in_kwargs", "out_kwargs"],
     [
         [
-            {
-                "num_workers": 2,
-            },
-            {},
-        ],
-        [
-            {  # You have to pass instances normally, but this is easier for testing
-                "activation_fct": torch.nn.Sigmoid,
-            },
-            {
-                "activation_fn": torch.nn.Sigmoid,
-            },
+            {"inputs": [["Hello there!", "Hello, World!"]], "num_workers": 2},
+            {"inputs": [["Hello there!", "Hello, World!"]]},
         ],
         [
             {
+                "inputs": [["Hello there!", "Hello, World!"]],
                 "activation_fct": torch.nn.Identity,
                 "activation_fn": torch.nn.Sigmoid,
             },
-            {
-                "activation_fn": torch.nn.Sigmoid,
-            },
+            {"inputs": [["Hello there!", "Hello, World!"]], "activation_fn": torch.nn.Sigmoid},
+        ],
+        [
+            {"sentences": [["Hello there!", "Hello, World!"]]},
+            {"inputs": [["Hello there!", "Hello, World!"]]},
         ],
     ],
 )
@@ -481,7 +474,7 @@ def test_predict_rank_args_decorator(
     monkeypatch.setattr(CrossEncoder, "predict", mock_predict)
 
     with caplog.at_level(logging.WARNING):
-        model.predict([["Hello there!", "Hello, World!"]], **in_kwargs)
+        model.predict(**in_kwargs)
         assert caplog.text != ""
     assert decorated_out_kwargs == out_kwargs
 
@@ -503,14 +496,6 @@ def test_logger_warning(caplog):
     with caplog.at_level(logging.WARNING):
         CrossEncoder(model_name, config_args={"classifier_dropout": 0.2})
         assert "`config_args` argument was renamed and is now deprecated" in caplog.text
-
-
-def test_deprecated_tokenizer_kwargs(caplog):
-    model_name = "cross-encoder-testing/reranker-bert-tiny-gooaq-bce"
-    with caplog.at_level(logging.WARNING):
-        CrossEncoder(model_name, tokenizer_kwargs={"model_max_length": 8192})
-        assert "`tokenizer_kwargs` argument was renamed and is now deprecated." in caplog.text
-        assert "Please use `processor_kwargs` instead" in caplog.text
 
 
 @pytest.mark.parametrize(

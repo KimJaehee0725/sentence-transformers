@@ -1320,13 +1320,3 @@ def test_router_transformers_model_property(
     from transformers import BertModel
 
     assert isinstance(model.transformers_model, BertModel)
-
-
-def test_deprecated_tokenizer_kwargs(caplog) -> None:
-    with caplog.at_level(logging.WARNING):
-        SentenceTransformer(
-            "sentence-transformers-testing/stsb-bert-tiny-safetensors",
-            tokenizer_kwargs={"model_max_length": 128},
-        )
-        assert "`tokenizer_kwargs` argument was renamed and is now deprecated." in caplog.text
-        assert "Please use `processor_kwargs` instead" in caplog.text

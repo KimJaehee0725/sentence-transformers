@@ -30,12 +30,9 @@ from sentence_transformers.base.evaluation import SentenceEvaluator
 from sentence_transformers.base.model_card import BaseModelCardData, generate_model_card
 from sentence_transformers.base.modules import Module, Router, Transformer
 from sentence_transformers.base.modules.modality_utils import (
-    ArrayInputs,
-    DictInputs,
-    ImageInputs,
     Modality,
-    PairStrInputs,
-    StrInputs,
+    PairInput,
+    SingleInput,
     infer_batch_modality,
 )
 from sentence_transformers.base.peft_mixin import PeftAdapterMixin
@@ -286,7 +283,7 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
 
     def preprocess(
         self,
-        inputs: list[StrInputs | PairStrInputs | DictInputs | ImageInputs | ArrayInputs],
+        inputs: list[SingleInput | PairInput],
         prompt: str | None = None,
         **kwargs,
     ) -> dict[str, Tensor | Any]:

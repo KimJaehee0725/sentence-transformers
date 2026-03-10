@@ -15,12 +15,9 @@ from transformers.utils import logging
 from sentence_transformers.base.modules.InputModule import InputModule
 from sentence_transformers.base.modules.modality_utils import (
     MODALITY_TO_PROCESSOR_ARG,
-    ArrayInputs,
-    DictInputs,
-    ImageInputs,
     Modality,
-    PairStrInputs,
-    StrInputs,
+    PairInput,
+    SingleInput,
     infer_batch_modality,
 )
 from sentence_transformers.base.modules.Module import Module
@@ -540,7 +537,7 @@ class Router(InputModule):
 
     def preprocess(
         self,
-        inputs: list[StrInputs | PairStrInputs | DictInputs | ImageInputs | ArrayInputs],
+        inputs: list[SingleInput | PairInput],
         prompt: str | None = None,
         task: str | None = None,
         modality: Modality | None = None,

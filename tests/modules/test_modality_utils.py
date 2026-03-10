@@ -3,10 +3,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 import torch
+from PIL import Image
 
 from sentence_transformers.base.modules.modality_utils import (
     MODALITY_TO_PROCESSOR_ARG,
     InputFormatter,
+    _is_non_text_pair,
     infer_batch_modality,
     infer_modality,
     is_audio_url_or_path,
@@ -294,14 +296,6 @@ class TestToMessages:
         result = fmt.to_messages({"text": "hello"})
         assert result == [{"role": "user", "content": "hello"}]
 
-    def test_flat_single_text_pair(self):
-        fmt = InputFormatter(model_type="test", message_format="flat")
-        result = fmt.to_messages({"text": ("query", "document")})
-        assert result == [
-            {"role": "query", "content": "query"},
-            {"role": "document", "content": "document"},
-        ]
-
     def test_flat_multimodal_falls_back_to_structured(self):
         fmt = InputFormatter(model_type="test", message_format="flat")
         result = fmt.to_messages({"text": "hello", "image": "cat.jpg"})
@@ -550,38 +544,6 @@ class TestPrependPromptToTexts:
         assert result == ["P: hello", ["P: q", "d"]]
 
 
-class TestToMessagesStructuredMultiInput:
-    """Tests for the structured multi-input (pair) path — verifying the query bundling fix."""
-
-    def test_query_contains_only_first_element(self):
-        fmt = InputFormatter(model_type="test", message_format="structured")
-        result = fmt.to_messages({"text": ["query", "document"]})
-        query_msgs = [m for m in result if m["role"] == "query"]
-        assert len(query_msgs) == 1
-        # Query should only contain value[0], not all elements
-        assert query_msgs[0]["content"] == [{"type": "text", "text": "query"}]
-
-    def test_document_messages(self):
-        fmt = InputFormatter(model_type="test", message_format="structured")
-        result = fmt.to_messages({"text": ["query", "doc1", "doc2"]})
-        doc_msgs = [m for m in result if m["role"] == "document"]
-        assert len(doc_msgs) == 2
-        assert doc_msgs[0]["content"] == [{"type": "text", "text": "doc1"}]
-        assert doc_msgs[1]["content"] == [{"type": "text", "text": "doc2"}]
-
-    def test_mixed_modality_with_string_and_list(self):
-        """When one modality has a list and another has a scalar, the scalar should not be iterated char-by-char."""
-        fmt = InputFormatter(model_type="test", message_format="structured")
-        result = fmt.to_messages({"text": ["query", "doc"], "image": "cat.jpg"})
-        # image should appear as a single content item, not split into characters
-        image_contents = []
-        for msg in result:
-            for item in msg["content"]:
-                if item["type"] == "image":
-                    image_contents.append(item["image"])
-        assert image_contents == ["cat.jpg"]
-
-
 class TestParseInputsEmpty:
     def test_empty_inputs_returns_empty_text(self):
         fmt = InputFormatter(model_type="test", message_format="structured")
@@ -628,3 +590,139 @@ class TestInferFormatFlattened:
 
         fmt = InputFormatter(model_type="unknown", message_format="structured")
         assert fmt._infer_format(EmptyTemplateProcessor()) == "structured"
+
+
+class TestIsNonTextPair:
+    def test_text_pair_is_not_non_text(self):
+        assert _is_non_text_pair(("hello", "world")) is False
+
+    def test_text_pair_list_is_not_non_text(self):
+        assert _is_non_text_pair(["hello", "world"]) is False
+
+    def test_image_text_pair(self):
+        img = Image.new("RGB", (32, 32))
+        assert _is_non_text_pair((img, "some text")) is True
+
+    def test_text_image_pair(self):
+        img = Image.new("RGB", (32, 32))
+        assert _is_non_text_pair(("some text", img)) is True
+
+    def test_image_image_pair(self):
+        img1 = Image.new("RGB", (32, 32))
+        img2 = Image.new("RGB", (32, 32))
+        assert _is_non_text_pair((img1, img2)) is True
+
+    def test_array_text_pair(self):
+        arr = np.random.randn(16000).astype(np.float32)
+        assert _is_non_text_pair((arr, "some text")) is True
+
+    def test_tensor_text_pair(self):
+        tensor = torch.randn(16000)
+        assert _is_non_text_pair((tensor, "some text")) is True
+
+    def test_single_element_not_pair(self):
+        assert _is_non_text_pair(("hello",)) is False
+
+    def test_three_elements_not_pair(self):
+        assert _is_non_text_pair(("a", "b", "c")) is False
+
+    def test_string_not_pair(self):
+        assert _is_non_text_pair("hello") is False
+
+    def test_message_dict_not_pair(self):
+        msg = {"role": "user", "content": "hello"}
+        assert _is_non_text_pair((msg, msg)) is False
+
+    def test_list_of_message_dicts_not_pair(self):
+        msgs = [{"role": "user", "content": "hello"}]
+        assert _is_non_text_pair((msgs, "text")) is False
+
+
+class TestPairToMessages:
+    def test_structured_same_modality(self):
+        fmt = InputFormatter(model_type="test", message_format="structured")
+        img1 = Image.new("RGB", (32, 32))
+        img2 = Image.new("RGB", (32, 32))
+        result = fmt.pair_to_messages((img1, img2))
+        assert len(result) == 2
+        assert result[0]["role"] == "query"
+        assert result[1]["role"] == "document"
+        assert result[0]["content"][0]["type"] == "image"
+        assert result[1]["content"][0]["type"] == "image"
+
+    def test_structured_cross_modality(self):
+        fmt = InputFormatter(model_type="test", message_format="structured")
+        img = Image.new("RGB", (32, 32))
+        result = fmt.pair_to_messages((img, "some text"))
+        assert len(result) == 2
+        assert result[0]["role"] == "query"
+        assert result[0]["content"][0]["type"] == "image"
+        assert result[1]["role"] == "document"
+        assert result[1]["content"][0]["type"] == "text"
+        assert result[1]["content"][0]["text"] == "some text"
+
+    def test_flat_format(self):
+        fmt = InputFormatter(model_type="test", message_format="flat")
+        img = Image.new("RGB", (32, 32))
+        result = fmt.pair_to_messages((img, "some text"))
+        assert len(result) == 2
+        assert result[0]["role"] == "query"
+        assert result[0]["content"] is img
+        assert result[1]["role"] == "document"
+        assert result[1]["content"] == "some text"
+
+    def test_text_text_pair(self):
+        fmt = InputFormatter(model_type="test", message_format="structured")
+        result = fmt.pair_to_messages(("query text", "document text"))
+        assert len(result) == 2
+        assert result[0]["content"][0]["type"] == "text"
+        assert result[0]["content"][0]["text"] == "query text"
+        assert result[1]["content"][0]["type"] == "text"
+        assert result[1]["content"][0]["text"] == "document text"
+
+
+class TestParseInputsPairs:
+    def test_text_pairs_stay_as_text(self):
+        """Text pairs should be detected as 'text' modality (tokenizer handles natively)."""
+        fmt = InputFormatter(model_type="test", message_format="structured")
+        modality, inputs, _ = fmt.parse_inputs([("hello", "world"), ("foo", "bar")])
+        assert modality == "text"
+        assert "text" in inputs
+        assert len(inputs["text"]) == 2
+
+    def test_non_text_pairs_become_message(self):
+        """Non-text pairs should be converted to message format."""
+        fmt = InputFormatter(model_type="test", message_format="structured")
+        img1 = Image.new("RGB", (32, 32))
+        img2 = Image.new("RGB", (32, 32))
+        modality, inputs, _ = fmt.parse_inputs([(img1, "text1"), (img2, "text2")])
+        assert modality == "message"
+        assert "message" in inputs
+        assert len(inputs["message"]) == 2
+        # Each message should have query and document roles
+        for messages in inputs["message"]:
+            assert len(messages) == 2
+            assert messages[0]["role"] == "query"
+            assert messages[1]["role"] == "document"
+
+    def test_image_image_pairs(self):
+        """Image-image pairs should be converted to message format."""
+        fmt = InputFormatter(model_type="test", message_format="structured")
+        img1 = Image.new("RGB", (32, 32))
+        img2 = Image.new("RGB", (64, 64))
+        modality, inputs, _ = fmt.parse_inputs([(img1, img2)])
+        assert modality == "message"
+        assert "message" in inputs
+        messages = inputs["message"][0]
+        assert messages[0]["content"][0]["type"] == "image"
+        assert messages[1]["content"][0]["type"] == "image"
+
+    def test_array_text_pairs(self):
+        """Audio array + text pairs should be converted to message format."""
+        fmt = InputFormatter(model_type="test", message_format="structured")
+        arr = np.random.randn(16000).astype(np.float32)
+        modality, inputs, _ = fmt.parse_inputs([(arr, "transcription")])
+        assert modality == "message"
+        messages = inputs["message"][0]
+        assert messages[0]["content"][0]["type"] == "audio"
+        assert messages[1]["content"][0]["type"] == "text"

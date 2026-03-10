@@ -48,14 +48,12 @@ from sentence_transformers.backend import load_onnx_model, load_openvino_model
 from sentence_transformers.base.modules.InputModule import InputModule
 from sentence_transformers.base.modules.modality_utils import (
     MODALITY_TO_PROCESSOR_ARG,
-    ArrayInputs,
-    DictInputs,
-    ImageInputs,
     InputFormatter,
     MessageFormat,
+    MessageInput,
     Modality,
-    PairStrInputs,
-    StrInputs,
+    PairInput,
+    SingleInput,
 )
 from sentence_transformers.util.decorators import transformer_kwargs_decorator
 
@@ -176,7 +174,7 @@ _AUDIO_MODALITY_CONFIG: tuple[ModalityConfig, str, bool] = (
     False,
 )
 
-_EDGE_CASE_MODALITY_CONFIGS: dict[str, tuple[ModalityConfig, str, bool]] = {
+_FEATURE_EXTRACTION_EDGE_CASES: dict[str, tuple[ModalityConfig, str, bool]] = {
     # Models with custom get_*_features methods that need output name validation
     "blip": (
         {
@@ -271,6 +269,44 @@ _EDGE_CASE_MODALITY_CONFIGS: dict[str, tuple[ModalityConfig, str, bool]] = {
     "wav2vec2-conformer": _AUDIO_MODALITY_CONFIG,
     "wavlm": _AUDIO_MODALITY_CONFIG,
     "whisper": _AUDIO_MODALITY_CONFIG,
+}
+
+_FILL_MASK_EDGE_CASES: dict[str, tuple[ModalityConfig, str, bool]] = {
+    # wav2vec2's forward outputs 'logits' rather than 'last_hidden_state' for fill-mask,
+    # but accepts audio input rather than text
+    "wav2vec2": (
+        {
+            "audio": {"method": "forward", "method_output_name": "logits"},
+        },
+        "token_embeddings",
+        False,
+    ),
+}
+
+_TEXT_GENERATION_EDGE_CASES = {
+    # Models supporting text+image without message format, but no image-only
+    "git": (
+        {
+            "text": {"method": "forward", "method_output_name": "logits"},
+            ("image", "text"): {"method": "forward", "method_output_name": "logits"},
+        },
+        "causal_logits",
+        False,
+    ),
+    # The Whisper decoder is text only
+    "whisper": (
+        {
+            "text": {"method": "forward", "method_output_name": "logits"},
+        },
+        "causal_logits",
+        False,
+    ),
+}
+
+_EDGE_CASE_MODALITY_CONFIGS: dict[str, dict[str, tuple[ModalityConfig, str, bool]]] = {
+    "feature-extraction": _FEATURE_EXTRACTION_EDGE_CASES,
+    "text-generation": _TEXT_GENERATION_EDGE_CASES,
+    "fill-mask": _FILL_MASK_EDGE_CASES,
 }
 
 
@@ -528,7 +564,7 @@ class Transformer(InputModule):
 
     def preprocess(
         self,
-        inputs: list[StrInputs | PairStrInputs | DictInputs | ImageInputs | ArrayInputs],
+        inputs: list[SingleInput | PairInput],
         prompt: str | None = None,
         **kwargs,
     ) -> dict[str, Any]:
@@ -809,7 +845,7 @@ class Transformer(InputModule):
 
     def _process_chat_messages(
         self,
-        messages: list[list[DictInputs]],
+        messages: list[list[MessageInput]],
         modality_kwargs: dict[str, dict[str, Any]],
         common_kwargs: dict[str, Any],
     ) -> dict[str, Any]:
@@ -1078,11 +1114,16 @@ class Transformer(InputModule):
         """Return a ``(modality_config, module_output_name)`` for model types that cannot be handled
         by the general :meth:`infer_modalities` inference path, or ``None`` to fall through.
 
-        Looks up the model type in :data:`_EDGE_CASE_MODALITY_CONFIGS`. For entries that require
-        output name validation (transformers v4/v5 compat), resolves each modality's
-        ``method_output_name`` against the actual model method via :meth:`_infer_method_output_name`.
+        Looks up the model type in the task-specific edge case configs from
+        :data:`_EDGE_CASE_MODALITY_CONFIGS`. For entries that require output name validation
+        (transformers v4/v5 compat), resolves each modality's ``method_output_name`` against the
+        actual model method via :meth:`_infer_method_output_name`.
         """
-        entry = _EDGE_CASE_MODALITY_CONFIGS.get(model.config.model_type)
+        task_edge_cases = _EDGE_CASE_MODALITY_CONFIGS.get(self.transformer_task)
+        if task_edge_cases is None:
+            return None
+
+        entry = task_edge_cases.get(model.config.model_type)
         if entry is None:
             return None
 

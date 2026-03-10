@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import logging
 import math
-
-# TODO: OrderedDict from typing or typing_dict? Or collections?
 import queue
 from collections import OrderedDict
 from collections.abc import Callable
@@ -15,11 +13,12 @@ import torch
 from torch import nn
 from tqdm.autonotebook import trange
 from transformers import AutoConfig, PretrainedConfig, PreTrainedModel, is_datasets_available
+from transformers.utils import logging as transformers_logging
 from typing_extensions import deprecated
 
 from sentence_transformers.base.model import BaseModel
 from sentence_transformers.base.modules import Transformer
-from sentence_transformers.base.modules.modality_utils import PairStrInputs
+from sentence_transformers.base.modules.modality_utils import PairableInput, PairInput
 from sentence_transformers.cross_encoder.fit_mixin import FitMixin
 from sentence_transformers.cross_encoder.model_card import CrossEncoderModelCardData
 from sentence_transformers.cross_encoder.modules.CausalScoreHead import CausalScoreHead
@@ -29,7 +28,8 @@ from sentence_transformers.util.decorators import (
     cross_encoder_predict_rank_args_decorator,
 )
 
-logger = logging.getLogger(__name__)
+# NOTE: transformers wraps the regular logging module for e.g. warning_once
+logger = transformers_logging.get_logger(__name__)
 
 
 class CrossEncoder(BaseModel, FitMixin):
@@ -176,8 +176,7 @@ class CrossEncoder(BaseModel, FitMixin):
             else:
                 logger.info(f"{len(non_empty_keys)} prompts are loaded, with the keys: {non_empty_keys}")
         if self.default_prompt_name:
-            # TODO: warning_once via transformers? Idem. with SentenceTransformer
-            logger.warning(
+            logger.warning_once(
                 f"Default prompt name is set to '{self.default_prompt_name}'. "
                 "This prompt will be applied to all `predict()` calls, except if `predict()` "
                 "is called with `prompt` or `prompt_name` parameters."
@@ -202,10 +201,7 @@ class CrossEncoder(BaseModel, FitMixin):
         processor_kwargs: dict[str, Any] | None = None,
         config_kwargs: dict[str, Any] | None = None,
     ) -> tuple[list[nn.Module] | OrderedDict[str, nn.Module], dict[str, Any]]:
-        # logger.warning(
-        #     f"No CrossEncoder model found with name {model_name_or_path}. Creating a new one with mean pooling."
-        # )
-
+        # TODO: Normalize logs with other architectures
         shared_kwargs = {
             "token": token,
             "trust_remote_code": trust_remote_code,
@@ -258,7 +254,7 @@ class CrossEncoder(BaseModel, FitMixin):
 
     def _multi_process(
         self,
-        inputs: list[PairStrInputs],
+        inputs: list[PairInput],
         show_progress_bar: bool | None = True,
         pool: dict[Literal["input", "output", "processes"], Any] | None = None,
         device: str | list[str | torch.device] | None = None,
@@ -337,7 +333,7 @@ class CrossEncoder(BaseModel, FitMixin):
         results_queue: Queue,
     ) -> None:
         """
-        Internal working process to predict sentence pairs in a multi-process setup.
+        Internal working process to predict input pairs in a multi-process setup.
 
         """
         while True:
@@ -367,6 +363,17 @@ class CrossEncoder(BaseModel, FitMixin):
                     pass
                 break
 
+    def _resolve_activation_fn(self, activation_fn_path: str) -> Callable | None:
+        """Instantiate an activation function from a dotted path string, respecting trust_remote_code."""
+        if self.trust_remote_code or activation_fn_path.startswith("torch."):
+            return import_from_string(activation_fn_path)()
+        logger.warning(
+            f"Activation function path '{activation_fn_path}' is not trusted, using default activation function instead. "
+            "Please load the CrossEncoder with `trust_remote_code=True` to allow loading custom activation "
+            "functions via the configuration."
+        )
+        return None
+
     def get_default_activation_fn(self) -> Callable:
         activation_fn_path = None
         if hasattr(self.config, "sentence_transformers") and "activation_fn" in self.config.sentence_transformers:
@@ -381,32 +388,16 @@ class CrossEncoder(BaseModel, FitMixin):
             del self.config.sbert_ce_default_activation_function
 
         if activation_fn_path is not None:
-            if self.trust_remote_code or activation_fn_path.startswith("torch."):
-                return import_from_string(activation_fn_path)()
-            logger.warning(
-                f"Activation function path '{activation_fn_path}' is not trusted, using default activation function instead. "
-                "Please load the CrossEncoder with `trust_remote_code=True` to allow loading custom activation "
-                "functions via the configuration."
-            )
+            resolved = self._resolve_activation_fn(activation_fn_path)
+            if resolved is not None:
+                return resolved
 
         if self.config.num_labels == 1:
             return nn.Sigmoid()
         return nn.Identity()
 
-    '''
-    def set_config_value(self, key: str, value: Any) -> None:
-        """Set a value in the underlying model's config under `sentence_transformers`."""
-        try:
-            if not hasattr(self.config, "sentence_transformers"):
-                self.config.sentence_transformers = {}
-            self.config.sentence_transformers[key] = value
-        except Exception as e:
-            logger.warning(f"Was not able to add '{key}' to the config: {str(e)}")
-    '''
-
     @property
     def config(self) -> PretrainedConfig:
-        # TODO: This won't work nicely
         return self[0].model.config
 
     @property
@@ -430,19 +421,6 @@ class CrossEncoder(BaseModel, FitMixin):
             return super(torch.nn.Module, self).__setattr__(name, value)
         return super().__setattr__(name, value)
 
-    '''
-    def forward(self, input: dict[str, torch.Tensor] = None, **kwargs) -> dict[str, torch.Tensor]:
-        """Run a forward pass through all modules in the model.
-
-        The preferred calling pattern is ``model(input)`` where ``input`` is a dictionary of tensors.
-        For backwards compatibility, calling ``model(**inputs)`` is still supported. In that case,
-        the keyword arguments are collected into a single input dictionary, akin to ``model(inputs)``.
-        """
-        if input is None and kwargs:
-            input = kwargs
-        return super().forward(input)
-    '''
-
     @property
     @deprecated("The `max_length` property was renamed and is now deprecated. Please use `max_seq_length` instead.")
     def max_length(self) -> int:
@@ -464,7 +442,7 @@ class CrossEncoder(BaseModel, FitMixin):
     @overload
     def predict(
         self,
-        sentences: PairStrInputs,
+        inputs: PairInput,
         prompt_name: str | None = ...,
         prompt: str | None = ...,
         batch_size: int = ...,
@@ -482,7 +460,7 @@ class CrossEncoder(BaseModel, FitMixin):
     @overload
     def predict(
         self,
-        sentences: list[PairStrInputs] | PairStrInputs,
+        inputs: list[PairInput] | PairInput,
         prompt_name: str | None = ...,
         prompt: str | None = ...,
         batch_size: int = ...,
@@ -500,7 +478,7 @@ class CrossEncoder(BaseModel, FitMixin):
     @overload
     def predict(
         self,
-        sentences: list[PairStrInputs] | PairStrInputs,
+        inputs: list[PairInput] | PairInput,
         prompt_name: str | None = ...,
         prompt: str | None = ...,
         batch_size: int = ...,
@@ -518,7 +496,7 @@ class CrossEncoder(BaseModel, FitMixin):
     @overload
     def predict(
         self,
-        sentences: list[PairStrInputs],
+        inputs: list[PairInput],
         prompt_name: str | None = ...,
         prompt: str | None = ...,
         batch_size: int = ...,
@@ -537,7 +515,7 @@ class CrossEncoder(BaseModel, FitMixin):
     @cross_encoder_predict_rank_args_decorator
     def predict(
         self,
-        sentences: list[PairStrInputs] | PairStrInputs,  # TODO: Rename to 'inputs' with decorator
+        inputs: list[PairInput] | PairInput,
         prompt_name: str | None = None,
         prompt: str | None = None,
         batch_size: int = 32,
@@ -552,7 +530,7 @@ class CrossEncoder(BaseModel, FitMixin):
         **kwargs,
     ) -> list[torch.Tensor] | np.ndarray | torch.Tensor:
         """
-        Performs predictions with the CrossEncoder on the given sentence pairs.
+        Performs predictions with the CrossEncoder on the given input pairs.
 
         .. tip::
 
@@ -561,8 +539,8 @@ class CrossEncoder(BaseModel, FitMixin):
             data to find the best value.
 
         Args:
-            sentences (Union[List[Tuple[str, str]], Tuple[str, str]]): A list of sentence pairs [(Sent1, Sent2), (Sent3, Sent4)]
-                or one sentence pair (Sent1, Sent2).
+            inputs (Union[List[Tuple[str, str]], Tuple[str, str]]): A list of input pairs [(Sent1, Sent2), (Sent3, Sent4)]
+                or one input pair (Sent1, Sent2).
             prompt_name (Optional[str], optional): The name of the prompt to use for encoding.
             prompt (Optional[str], optional): The prompt to use for encoding.
             batch_size (int, optional): Batch size for encoding. Defaults to 32.
@@ -570,7 +548,6 @@ class CrossEncoder(BaseModel, FitMixin):
             activation_fn (callable, optional): Activation function applied on the logits output of the CrossEncoder.
                 If None, the ``model.activation_fn`` will be used, which defaults to :class:`torch.nn.Sigmoid` if num_labels=1, else
                 :class:`torch.nn.Identity`. Defaults to None.
-            convert_to_numpy (bool, optional): Convert the output to a numpy matrix. Defaults to True.
             apply_softmax (bool, optional): If set to True and `model.num_labels > 1`, applies softmax on the logits
                 output such that for each sample, the scores of each class sum to 1. Defaults to False.
             convert_to_numpy (bool, optional): Whether the output should be a list of numpy vectors. If False, output
@@ -587,7 +564,7 @@ class CrossEncoder(BaseModel, FitMixin):
                 Only used when ``pool`` is not None or ``device`` is a list. Defaults to None.
 
         Returns:
-            Union[List[torch.Tensor], np.ndarray, torch.Tensor]: Predictions for the passed sentence pairs.
+            Union[List[torch.Tensor], np.ndarray, torch.Tensor]: Predictions for the passed input pairs.
             The return type depends on the ``convert_to_numpy`` and ``convert_to_tensor`` parameters.
             If ``convert_to_tensor`` is True, the output will be a :class:`torch.Tensor`.
             If ``convert_to_numpy`` is True, the output will be a :class:`numpy.ndarray`.
@@ -612,14 +589,14 @@ class CrossEncoder(BaseModel, FitMixin):
                 model.stop_multi_process_pool(pool)
         """
         # Cast an individual pair to a list with length 1
-        is_singular_input = self.is_singular_input(sentences)
+        is_singular_input = self.is_singular_input(inputs)
         if is_singular_input:
-            sentences = [sentences]
+            inputs = [inputs]
 
         # If pool or a list of devices is provided, use multi-process prediction
         if pool is not None or (isinstance(device, list) and len(device) > 0):
             pred_scores = self._multi_process(
-                inputs=sentences,
+                inputs=inputs,
                 # Utility and post-processing parameters
                 show_progress_bar=show_progress_bar,
                 # Multi-process encoding parameters
@@ -670,8 +647,8 @@ class CrossEncoder(BaseModel, FitMixin):
 
         pred_scores = []
         self.eval()
-        for start_index in trange(0, len(sentences), batch_size, desc="Batches", disable=not show_progress_bar):
-            batch = sentences[start_index : start_index + batch_size]
+        for start_index in trange(0, len(inputs), batch_size, desc="Batches", disable=not show_progress_bar):
+            batch = inputs[start_index : start_index + batch_size]
             features = self.preprocess(batch, prompt=prompt, **kwargs)
             features = batch_to_device(features, device)
             out_features = self.forward(features, **kwargs)
@@ -708,8 +685,8 @@ class CrossEncoder(BaseModel, FitMixin):
     @cross_encoder_predict_rank_args_decorator
     def rank(
         self,
-        query: str,
-        documents: list[str],
+        query: PairableInput,
+        documents: list[PairableInput],
         top_k: int | None = None,
         return_documents: bool = False,
         prompt_name: str | None = None,
@@ -799,9 +776,9 @@ class CrossEncoder(BaseModel, FitMixin):
                 "CrossEncoder.rank() only works for models with num_labels=1. "
                 "Consider using CrossEncoder.predict() with input pairs instead."
             )
-        query_doc_pairs: list[PairStrInputs] = [[query, doc] for doc in documents]
+        query_doc_pairs: list[PairInput] = [[query, doc] for doc in documents]
         scores = self.predict(
-            sentences=query_doc_pairs,
+            inputs=query_doc_pairs,
             prompt_name=prompt_name,
             prompt=prompt,
             batch_size=batch_size,
@@ -824,7 +801,7 @@ class CrossEncoder(BaseModel, FitMixin):
         results = sorted(results, key=lambda x: x["score"], reverse=True)
         return results[:top_k]
 
-    def is_singular_input(self, inputs: PairStrInputs | list[PairStrInputs]) -> bool:
+    def is_singular_input(self, inputs: PairInput | list[PairInput]) -> bool:
         """
         Check if the input represents a single example or a batch of examples.
 
@@ -855,13 +832,7 @@ class CrossEncoder(BaseModel, FitMixin):
             self.default_prompt_name = model_config.get("default_prompt_name", None)
         if "activation_fn" in model_config:
             activation_fn_path = model_config["activation_fn"]
-            # TODO: This is duplicate with get_default_activation_fn, definitely refactor
             if activation_fn_path is not None:
-                if self.trust_remote_code or activation_fn_path.startswith("torch."):
-                    self.activation_fn = import_from_string(activation_fn_path)()
-                    return
-                logger.warning(
-                    f"Activation function path '{activation_fn_path}' is not trusted, using default activation function instead. "
-                    "Please load the CrossEncoder with `trust_remote_code=True` to allow loading custom activation "
-                    "functions via the configuration."
-                )
+                resolved = self._resolve_activation_fn(activation_fn_path)
+                if resolved is not None:
+                    self.activation_fn = resolved

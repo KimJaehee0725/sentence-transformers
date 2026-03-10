@@ -19,7 +19,7 @@ from typing_extensions import deprecated
 
 from sentence_transformers.base import BaseModel
 from sentence_transformers.base.modules import Transformer
-from sentence_transformers.base.modules.modality_utils import StrInputs
+from sentence_transformers.base.modules.modality_utils import TextInput
 from sentence_transformers.sentence_transformer.modules import Pooling
 from sentence_transformers.sparse_encoder.model_card import SparseEncoderModelCardData
 from sentence_transformers.sparse_encoder.modules import SparseAutoEncoder, SpladePooling
@@ -221,7 +221,7 @@ class SparseEncoder(BaseModel):
     @deprecated_kwargs(sentences="inputs")
     def encode_query(
         self,
-        inputs: list[StrInputs] | StrInputs,
+        inputs: list[TextInput] | TextInput,
         prompt_name: str | None = None,
         prompt: str | None = None,
         batch_size: int = 32,
@@ -294,7 +294,7 @@ class SparseEncoder(BaseModel):
     @deprecated_kwargs(sentences="inputs")
     def encode_document(
         self,
-        inputs: list[StrInputs] | StrInputs,
+        inputs: list[TextInput] | TextInput,
         prompt_name: str | None = None,
         prompt: str | None = None,
         batch_size: int = 32,
@@ -370,7 +370,7 @@ class SparseEncoder(BaseModel):
     @deprecated_kwargs(sentences="inputs")
     def encode(
         self,
-        inputs: list[StrInputs] | StrInputs,
+        inputs: list[TextInput] | TextInput,
         prompt_name: str | None = None,
         prompt: str | None = None,
         batch_size: int = 32,
@@ -736,7 +736,7 @@ class SparseEncoder(BaseModel):
 
     def _multi_process(
         self,
-        inputs: list[StrInputs],
+        inputs: list[TextInput],
         show_progress_bar: bool | None = True,
         pool: dict[Literal["input", "output", "processes"], Any] | None = None,
         device: str | torch.device | list[str | torch.device] | None = None,
@@ -1003,7 +1003,10 @@ class SparseEncoder(BaseModel):
         )
         modules = list(modules.values())
         # Use the output dimension of the last module as the SAE input dimension
-        output_dim = modules[-1].get_embedding_dimension()
+        for module in reversed(modules):
+            if hasattr(module, "get_embedding_dimension"):
+                output_dim = module.get_embedding_dimension()
+                break
         sae = SparseAutoEncoder(
             input_dim=output_dim,
             hidden_dim=4 * output_dim,
