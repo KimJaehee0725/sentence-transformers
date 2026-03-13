@@ -786,7 +786,7 @@ def mine_hard_negatives(
     # Report some statistics
     if verbose:
         row_format = "{:<6} {:>14} {:>14} {:>14}"
-        formatter = lambda value: (f"{value.item():.4f}" if isinstance(value, torch.Tensor) else f"{value:,}")
+        formatter = lambda value: f"{value.item():.4f}" if isinstance(value, torch.Tensor) else f"{value:,}"
         print(row_format.format("Metric", "Positive", "Negative", "Difference"))
         print(
             row_format.format(
