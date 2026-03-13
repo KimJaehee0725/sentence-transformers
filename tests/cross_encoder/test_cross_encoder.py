@@ -309,23 +309,6 @@ def test_push_to_hub(
     assert url == "https://huggingface.co/cross-encoder-testing/stsb-distilroberta-base/discussions/123"
     mock_upload_folder_kwargs.clear()
 
-    """
-    url = model.push_to_hub("cross-encoder-testing/stsb-distilroberta-base", tags="test-push-to-hub-tag-1")
-    assert mock_upload_folder_kwargs["repo_id"] == "cross-encoder-testing/stsb-distilroberta-base"
-    assert url == "https://huggingface.co/cross-encoder-testing/stsb-distilroberta-base/commit/123456"
-    mock_upload_folder_kwargs.clear()
-    assert "test-push-to-hub-tag-1" in model.model_card_data.tags
-
-    url = model.push_to_hub(
-        "cross-encoder-testing/stsb-distilroberta-base", tags=["test-push-to-hub-tag-2", "test-push-to-hub-tag-3"]
-    )
-    assert mock_upload_folder_kwargs["repo_id"] == "cross-encoder-testing/stsb-distilroberta-base"
-    assert url == "https://huggingface.co/cross-encoder-testing/stsb-distilroberta-base/commit/123456"
-    mock_upload_folder_kwargs.clear()
-    assert "test-push-to-hub-tag-2" in model.model_card_data.tags
-    assert "test-push-to-hub-tag-3" in model.model_card_data.tags
-    """
-
 
 @pytest.mark.parametrize(
     ["in_args", "in_kwargs", "out_args", "out_kwargs"],

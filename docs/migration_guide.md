@@ -15,6 +15,7 @@ TODO: Notes to self:
 - Renamed `in_word_embedding_dimension` constructor parameter to `in_embedding_dimension` on CNN (with backwards compatibility)
 - Add `prompt` and `task` kwargs to CrossEncoder losses, which can be forwarded to the `CrossEncoder.preprocess` method in the loss `forward` method (with backwards compatibility)
 - Passing `activation_fn` to `CrossEncoder.predict` no longer persists the activation function on the instance; it only applies for that call
+- Removed `tags` parameter from `push_to_hub`; use `model.model_card_data.tags.append("my-tag")` before calling `push_to_hub` instead
 
 ## Migrating from v4.x to v5.x
 
