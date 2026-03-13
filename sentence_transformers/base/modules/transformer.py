@@ -15,7 +15,6 @@ from transformers import (
     AutoModel,
     AutoModelForCausalLM,
     AutoModelForMaskedLM,
-    AutoModelForMultimodalLM,
     AutoModelForSequenceClassification,
     AutoProcessor,
     BlenderbotConfig,
@@ -112,9 +111,17 @@ TRANSFORMER_TASK_TO_AUTO_MODEL: dict[TransformerTask, Any] = {
     "feature-extraction": AutoModel,  # Used by SentenceTransformer, also covers "image-feature-extraction"
     "sequence-classification": AutoModelForSequenceClassification,  # Used by CrossEncoder
     "text-generation": AutoModelForCausalLM,  # Used by CrossEncoder
-    "any-to-any": AutoModelForMultimodalLM,  # Used by CrossEncoder, also covers "image-text-to-text"
     "fill-mask": AutoModelForMaskedLM,  # Used by SparseEncoder
 }
+
+try:
+    from transformers import AutoModelForMultimodalLM
+
+    TRANSFORMER_TASK_TO_AUTO_MODEL["any-to-any"] = (
+        AutoModelForMultimodalLM  # Used by CrossEncoder, also covers "image-text-to-text"
+    )
+except ImportError:
+    pass
 
 # Default (modality_config, module_output_name) per transformer task.
 # Used as the fallback when loading models saved before modality_config was introduced,
@@ -449,6 +456,11 @@ class Transformer(InputModule):
     ) -> None:
         super().__init__()
         if transformer_task not in TRANSFORMER_TASK_TO_AUTO_MODEL:
+            if transformer_task == "any-to-any":
+                raise ImportError(
+                    "The 'any-to-any' transformer task requires transformers v5+. "
+                    "Please upgrade transformers with `pip install transformers>=5.0.0`."
+                )
             raise ValueError(
                 f"Unsupported transformer_task '{transformer_task}'. Supported tasks are: {list(TRANSFORMER_TASK_TO_AUTO_MODEL.keys())}"
             )

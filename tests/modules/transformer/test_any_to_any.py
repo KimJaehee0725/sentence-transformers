@@ -13,7 +13,6 @@ import pytest
 import torch
 from packaging.version import Version
 from transformers import __version__ as transformers_version
-from transformers.models.auto.modeling_auto import MODEL_FOR_MULTIMODAL_LM_MAPPING_NAMES, MODEL_MAPPING_NAMES
 
 from sentence_transformers.modules import Transformer
 from sentence_transformers.util.tensor import batch_to_device
@@ -33,6 +32,12 @@ from .conftest import (
     load_transformer,
     modify_processor_for_pairs,
 )
+
+try:
+    from transformers.models.auto.modeling_auto import MODEL_FOR_MULTIMODAL_LM_MAPPING_NAMES, MODEL_MAPPING_NAMES
+except ImportError:
+    pytest.skip("any-to-any requires transformers v5+", allow_module_level=True)
+
 
 EXPECT_FORWARD_FAIL = EXPECT_FORWARD_FAIL.copy() | {
     "llama4": (  # Cannot copy out of meta tensor; no data!, except text only which does work

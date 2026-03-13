@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 import torch
+from packaging.version import Version
 from packaging.version import parse as parse_version
 from tokenizers.normalizers import NFC, Lowercase, Sequence
 from transformers import AutoModel, AutoProcessor
@@ -954,3 +955,12 @@ class TestEncoderOnlySaveLoadRoundtrip:
             out2 = reloaded(features)
 
         self._assert_outputs_match(out1, out2)
+
+
+@pytest.mark.skipif(
+    Version(transformers_version) >= Version("5.0.0"),
+    reason="Test only applies to transformers v4",
+)
+def test_any_to_any_requires_transformers_v5():
+    with pytest.raises(ImportError, match="transformers v5"):
+        Transformer("hf-internal-testing/tiny-random-LlamaForCausalLM", transformer_task="any-to-any")
