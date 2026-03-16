@@ -259,27 +259,28 @@ def test_router_is_alias_for_asym():
     assert Router is Asym
 
 
-@pytest.mark.xfail(reason="We're no longer supporting using tasks as dictionary keys.")
 def test_router_backwards_compatibility(static_embedding_model):
-    """Test that Router can load models saved with Asym."""
+    """Test that passing task types as dictionary keys raises a helpful error."""
 
-    # Create a mock Asym model
     asym_model = Asym({"query": [static_embedding_model], "document": [static_embedding_model]})
-
-    # Replace the dictionary with our tracking version
-    tracking_dict = TaskTypesTrackingModuleDict(asym_model.sub_modules)
-    asym_model.sub_modules = tracking_dict
-
     model = SentenceTransformer(modules=[asym_model])
-    model.encode([{"query": "What is the capital of France?"}, {"query": "The capital of France is Paris."}])
-    assert tracking_dict.tasks == ["query", "query"]
-    tracking_dict.tasks = []
 
-    model.encode([{"document": "What is the capital of France?"}, {"document": "The capital of France is Paris."}])
-    assert tracking_dict.tasks == ["document", "document"]
-    tracking_dict.tasks = []
+    with pytest.raises(
+        ValueError,
+        match=r"Passing task types as dictionary keys \(e\.g\. \{'query': ...\}\) is no longer supported\. Instead, pass the inputs directly and use the `task` parameter",
+    ):
+        model.encode([{"query": "What is the capital of France?"}, {"query": "The capital of France is Paris."}])
 
-    with pytest.raises(ValueError, match=r"You cannot pass a list of dictionaries with different task types\. .*"):
+    with pytest.raises(
+        ValueError,
+        match=r"Passing task types as dictionary keys \(e\.g\. \{'document': ...\}\) is no longer supported\. Instead, pass the inputs directly and use the `task` parameter",
+    ):
+        model.encode([{"document": "What is the capital of France?"}, {"document": "The capital of France is Paris."}])
+
+    with pytest.raises(
+        ValueError,
+        match=r"Passing task types as dictionary keys \(e\.g\. \{'query': ...\}\) is no longer supported\. Instead, pass the inputs directly and use the `task` parameter",
+    ):
         model.encode(
             [
                 {"document": "What is the capital of France?"},

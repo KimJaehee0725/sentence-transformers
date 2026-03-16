@@ -4,7 +4,7 @@
 
 TODO: Notes to self:
 - Updating the import paths (although there's backwards compatibility)
-- Avoiding using Router keys as dictionary keys in the input
+- Avoiding using Router keys as dictionary keys in the input, use task=... or encode_query/encode_document instead
 - Renamed tokenizer_kwargs to processor_kwargs (with backwards compatibility)
 - Renamed SentenceTransformer.get_sentence_embedding_dimension to SentenceTransformer.get_embedding_dimension (with backwards compatibility)
 - Renamed SparseEncoder.get_sentence_embedding_dimension to SparseEncoder.get_embedding_dimension (with backwards compatibility)

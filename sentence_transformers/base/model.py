@@ -399,19 +399,37 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
                 modality = infer_batch_modality(inputs)
             except (ValueError, TypeError):
                 pass
-            else:
-                if not self.supports(modality):
-                    supported = ", ".join(format_modality(m) for m in self.modalities)
-                    message = (
-                        f"Modality '{format_modality(modality)}' is not supported by this {type(self).__name__} model. "
-                        f"Supported modalities: {supported}"
-                    )
-                    if isinstance(modality, tuple) and all(part in self.modalities for part in modality):
-                        message += (
-                            f"\nThis model supports {' and '.join(modality)} individually, "
-                            "but not in the same input. Please encode each modality separately."
+
+            if modality is not None and not self.supports(modality):
+                # Check if this looks like the old Asym/Router dict-style input,
+                # e.g. [{"query": "text"}, {"query": "text"}], where the dict keys
+                # are task names rather than modalities.
+                if isinstance(self[0], Router):
+                    route_names = set(self[0].sub_modules.keys())
+                    if isinstance(modality, tuple):
+                        task_name = next((key for key in modality if key in route_names), None)
+                    elif modality == "message" and all(isinstance(inp, dict) for inp in inputs):
+                        dict_keys = {key for inp in inputs for key in inp.keys()}  # type: ignore[union-attr]
+                        task_name = next((key for key in dict_keys if key in route_names), None)
+                    else:
+                        task_name = None
+                    if task_name is not None:
+                        raise ValueError(
+                            f"Passing task types as dictionary keys (e.g. {{'{task_name}': ...}}) is no longer supported. "
+                            f'Instead, pass the inputs directly and use the `task` parameter, e.g. task="{task_name}".'
                         )
-                    raise ValueError(message)
+
+                supported = ", ".join(format_modality(m) for m in self.modalities)
+                message = (
+                    f"Modality '{format_modality(modality)}' is not supported by this {type(self).__name__} model. "
+                    f"Supported modalities: {supported}"
+                )
+                if isinstance(modality, tuple) and all(part in self.modalities for part in modality):
+                    message += (
+                        f"\nThis model supports {' and '.join(modality)} individually, "
+                        "but not in the same input. Please encode each modality separately."
+                    )
+                raise ValueError(message)
 
         # Backwards compatibility: fall back to preprocess/tokenize without prompt if the
         # input module doesn't accept it. Only the main path (preprocess with prompt) will
