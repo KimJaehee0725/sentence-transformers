@@ -620,7 +620,7 @@ class Transformer(InputModule):
 
         attn_implementation = self.config._attn_implementation
         if is_flash_attention_requested(requested_attention_implementation=attn_implementation):
-            (_, flash_varlen_fn, _, _, _), _ = lazy_import_flash_attention(attn_implementation)
+            (_, flash_varlen_fn, *_), _ = lazy_import_flash_attention(attn_implementation)
             if flash_varlen_fn is not None:
                 logger.info(
                     "Using flattened inputs with flash attention variable-length functions to avoid padding overhead."
