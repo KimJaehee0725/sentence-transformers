@@ -530,6 +530,9 @@ class SentenceTransformer(BaseModel, FitMixin):
         is_singular_input = self.is_singular_input(inputs)
         if is_singular_input:
             inputs = [inputs]
+        elif not isinstance(inputs, list):
+            # Materialize e.g. datasets.Column to avoid slow Arrow deserialization on each index
+            inputs = list(inputs)
 
         # Validate kwargs
         model_kwargs = self.get_model_kwargs()

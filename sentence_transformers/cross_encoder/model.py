@@ -576,6 +576,9 @@ class CrossEncoder(BaseModel, FitMixin):
         is_singular_input = self.is_singular_input(inputs)
         if is_singular_input:
             inputs = [inputs]
+        elif not isinstance(inputs, list):
+            # Materialize e.g. datasets.Column to avoid slow Arrow deserialization on each index
+            inputs = list(inputs)
 
         # If pool or a list of devices is provided, use multi-process prediction
         if pool is not None or (isinstance(device, list) and len(device) > 0):

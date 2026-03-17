@@ -454,6 +454,9 @@ class SparseEncoder(BaseModel):
         is_singular_input = self.is_singular_input(inputs)
         if is_singular_input:
             inputs = [inputs]
+        elif not isinstance(inputs, list):
+            # Materialize e.g. datasets.Column to avoid slow Arrow deserialization on each index
+            inputs = list(inputs)
 
         # Throw an error if unused kwargs are passed, except 'task' which is always allowed, even
         # when it does not do anything (as e.g. there's no Router module in the model)
