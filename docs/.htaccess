@@ -75,7 +75,7 @@ Redirect 301 /examples/unsupervised_learning/TSDAE/README.html /examples/sentenc
 Redirect 301 /docs/package_reference/sentence_transformer/quantization.html /docs/package_reference/util/quantization.html
 Redirect 301 /docs/package_reference/util.html /docs/package_reference/util/index.html
 
-# Moved API Reference pages for multimodality refactor (TODO: Which version?)
+# Moved API Reference pages for v5.4.0, the multimodality refactor
 Redirect 301 /docs/package_reference/sentence_transformer/models.html /docs/package_reference/sentence_transformer/modules.html
 Redirect 301 /docs/package_reference/cross_encoder/models.html /docs/package_reference/cross_encoder/modules.html
 Redirect 301 /docs/package_reference/sparse_encoder/models.html /docs/package_reference/sparse_encoder/modules.html
