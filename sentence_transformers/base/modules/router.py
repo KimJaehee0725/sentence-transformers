@@ -22,8 +22,6 @@ logger = logging.get_logger(__name__)
 
 
 class Router(InputModule):
-    # TODO: Update the __repr__, it likely got overridden by (Input)Module instead of letting nn.Module handle it
-    # Also update sparse_encoder/training_overview 'Inference-free Splade' section
     forward_kwargs = {"task", "modality"}
     config_keys: list[str] = ["default_route", "allow_empty_key", "route_mappings"]
     config_file_name = "router_config.json"
@@ -478,6 +476,19 @@ class Router(InputModule):
             }
             features = module(features, **module_kwargs)
         return features
+
+    def __repr__(self) -> str:
+        # Use nn.Module's repr to show the full sub-module structure,
+        # rather than Module's repr which only shows config_keys
+        return nn.Module.__repr__(self)
+
+    def extra_repr(self) -> str:
+        parts = []
+        if self.default_route is not None:
+            parts.append(f"default_route={self.default_route!r}")
+        if self.route_mappings:
+            parts.append(f"route_mappings={self.route_mappings}")
+        return ", ".join(parts)
 
     def get_embedding_dimension(self) -> int:
         for sub_modules in self.sub_modules.values():

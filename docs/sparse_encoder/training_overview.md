@@ -129,7 +129,21 @@ But if instead you want to train from another checkpoint, or from scratch, then 
 
         # Create the inference-free model
         model = SparseEncoder(modules=[router], similarity_fn_name="dot")
-    
+        # SparseEncoder(
+        #   (0): Router(
+        #     default_route='document'
+        #     (sub_modules): ModuleDict(
+        #       (query): Sequential(
+        #         (0): SparseStaticEmbedding({'frozen': False}, dim=30522, tokenizer=BertTokenizerFast)
+        #       )
+        #       (document): Sequential(
+        #         (0): Transformer({'transformer_task': 'fill-mask', 'modality_config': {'text': {'method': 'forward', 'method_output_name': 'logits'}}, 'module_output_name': 'token_embeddings', 'architecture': 'BertForMaskedLM'})
+        #         (1): SpladePooling({'pooling_strategy': 'max', 'activation_function': 'relu', 'embedding_dimension': None})
+        #       )
+        #     )
+        #   )
+        # )
+
     This architecture allows for fast query-time processing using the lightweight SparseStaticEmbedding approach, that can be trained and seen as a linear weights, while documents are processed with the full MLM transformer and SpladePooling.
 
     .. tip::
