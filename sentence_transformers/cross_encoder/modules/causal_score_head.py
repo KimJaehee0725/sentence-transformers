@@ -13,33 +13,19 @@ class CausalScoreHead(Module):
         super().__init__()
         self.true_token_id = true_token_id
         self.false_token_id = false_token_id
-        self.num_labels = 1
+        self.num_labels = 1  # TODO: More labels? Is that possible?
 
     def forward(self, features: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-        is_padding_left = torch.all(features["attention_mask"][:, -1]).item()
+        # Left padding is enforced by Transformer, so the last position is always a real token.
+        # With logits_to_keep=1, causal_logits has shape (batch_size, 1, vocab_size), which we
+        # convert to (batch_size, vocab_size).
+        logits = features["causal_logits"][:, -1]
 
-        logits = features["causal_logits"]
-        token_indices = (
-            torch.tensor([self.true_token_id])
-            if self.false_token_id is None
-            else torch.tensor([self.true_token_id, self.false_token_id])
-        )
-        # Get logits for the true/false token(s)
-        if is_padding_left:
-            logits = logits[:, -1, token_indices]
-        else:
-            last_token_indices = features["attention_mask"].sum(1) - 1
-            logits = logits[:, :, token_indices]
-            logits = logits[torch.arange(logits.size(0)), last_token_indices, :]
-
-        # If only true_token_id is provided, return its logit as score. Otherwise, return the difference between true
-        # and false logits.
         if self.false_token_id is None:
-            scores = logits[:, 0]
+            scores = logits[:, self.true_token_id]
         else:
-            scores = logits[:, 0] - logits[:, 1]
-        # TODO: Not sure if this unsqueeze is necessary
-        # scores = scores.unsqueeze(1)
+            scores = logits[:, self.true_token_id] - logits[:, self.false_token_id]
+
         features["scores"] = scores
         return features
 

@@ -146,6 +146,86 @@ def test_model_card_base(
     assert "\n\n\n" not in model_card
 
 
+def _reset_for_snippet(model: SentenceTransformer) -> None:
+    """Reset model_card_data fields to ensure a clean snippet test."""
+    model.model_card_data.predict_example = None
+    model.model_card_data.predict_example_display = None
+    model.model_card_data.similarities = None
+    model.model_card_data.ir_model = None
+
+
+class TestGenerateUsageSnippetIR:
+    """Verify IR-model snippet with encode_query / encode_document."""
+
+    def test_ir_snippet_structure(self, stsb_bert_tiny_model: SentenceTransformer) -> None:
+        model = stsb_bert_tiny_model
+        _reset_for_snippet(model)
+        model.model_card_data.ir_model = True
+        model.model_card_data.predict_example = ["query?", "doc A", "doc B"]
+        snippet = model.model_card_data.generate_usage_snippet()
+
+        assert "queries = [" in snippet
+        assert "documents = [" in snippet
+        assert "model.encode_query(queries)" in snippet
+        assert "model.encode_document(documents)" in snippet
+        assert "'query?'" in snippet
+        assert "'doc A'" in snippet
+        assert "'doc B'" in snippet
+
+    def test_ir_default_examples(self, stsb_bert_tiny_model: SentenceTransformer) -> None:
+        model = stsb_bert_tiny_model
+        _reset_for_snippet(model)
+        model.model_card_data.ir_model = True
+        snippet = model.model_card_data.generate_usage_snippet()
+
+        assert "Red Planet" in snippet
+        assert "encode_query" in snippet
+
+    def test_ir_snippet_shapes(self, stsb_bert_tiny_model: SentenceTransformer) -> None:
+        model = stsb_bert_tiny_model
+        _reset_for_snippet(model)
+        model.model_card_data.ir_model = True
+        model.model_card_data.predict_example = ["q", "d1", "d2", "d3"]
+        dim = model.get_embedding_dimension()
+        snippet = model.model_card_data.generate_usage_snippet()
+
+        assert f"# [1, {dim}] [3, {dim}]" in snippet
+        assert "# [1, 3]" in snippet
+
+    def test_ir_with_similarities(self, stsb_bert_tiny_model: SentenceTransformer) -> None:
+        model = stsb_bert_tiny_model
+        _reset_for_snippet(model)
+        model.model_card_data.ir_model = True
+        model.model_card_data.predict_example = ["q", "d1"]
+        model.model_card_data.similarities = "# tensor([[0.42]])"
+        snippet = model.model_card_data.generate_usage_snippet()
+
+        assert "print(similarities)" in snippet
+        assert "# tensor([[0.42]])" in snippet
+
+    def test_non_ir_falls_through_to_base(self, stsb_bert_tiny_model: SentenceTransformer) -> None:
+        """When ir_model is None, SentenceTransformerModelCardData uses the base snippet."""
+        model = stsb_bert_tiny_model
+        _reset_for_snippet(model)
+        model.model_card_data.predict_example = ["A", "B"]
+        snippet = model.model_card_data.generate_usage_snippet()
+
+        assert "sentences = [" in snippet
+        assert "encode_query" not in snippet
+
+    def test_display_precedence(self, stsb_bert_tiny_model: SentenceTransformer) -> None:
+        """predict_example_display takes precedence over predict_example for rendering."""
+        model = stsb_bert_tiny_model
+        _reset_for_snippet(model)
+        model.model_card_data.predict_example = ["original A", "original B"]
+        model.model_card_data.predict_example_display = ["display A", "display B"]
+        snippet = model.model_card_data.generate_usage_snippet()
+
+        assert "'display A'" in snippet
+        assert "'display B'" in snippet
+        assert "original" not in snippet
+
+
 def test_model_card_set_transform(stsb_bert_tiny_model: SentenceTransformer, dummy_dataset: Dataset) -> None:
     model = stsb_bert_tiny_model
 

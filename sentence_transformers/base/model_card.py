@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import random
 import re
 from collections import Counter, UserDict, defaultdict
@@ -28,11 +29,26 @@ from transformers.modelcard import make_markdown_table
 from transformers.trainer_callback import TrainerControl, TrainerState
 
 from sentence_transformers import __version__ as sentence_transformers_version
+from sentence_transformers.base.modality import format_modality
 from sentence_transformers.base.training_args import BaseTrainingArguments
 from sentence_transformers.util import fullname, is_accelerate_available, is_datasets_available
 
 if is_datasets_available():
     from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict, Value
+
+    try:
+        from datasets import Image as ImageFeature
+    except ImportError:
+        ImageFeature = None
+    try:
+        from datasets import Audio as AudioFeature
+    except ImportError:
+        AudioFeature = None
+
+try:
+    from PIL.Image import Image as PILImage
+except ImportError:
+    PILImage = None
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +56,6 @@ if TYPE_CHECKING:
     from sentence_transformers.base.evaluation.evaluator import BaseEvaluator
     from sentence_transformers.base.model import BaseModel
     from sentence_transformers.base.trainer import BaseTrainer
-
-# TODO: Add image, video, and audio support in the model cards: training/evaluation dataset information,
-# widget examples, inference examples, and more.
 
 
 class BaseModelCardCallback(TrainerCallback):
@@ -198,7 +211,7 @@ YAML_FIELDS = [
     "co2_eq_emissions",
     "base_model",
 ]
-IGNORED_FIELDS = ["model", "trainer", "eval_results_dict"]
+IGNORED_FIELDS = ["model", "trainer", "eval_results_dict", "save_dir", "predict_example_display", "_asset_cache"]
 
 
 def get_versions() -> dict[str, Any]:
@@ -322,7 +335,8 @@ class BaseModelCardData(CardData):
     eval_results_dict: dict[BaseEvaluator, dict[str, Any]] | None = field(default_factory=dict, init=False)
     training_logs: list[dict[str, float]] = field(default_factory=list, init=False)
     widget: list[dict[str, str]] = field(default_factory=list, init=False)
-    predict_example: list[str] | None = field(default=None, init=False)
+    predict_example: list | None = field(default=None, init=False)
+    predict_example_display: list | None = field(default=None, init=False, repr=False)
     label_example_list: list[dict[str, str]] = field(default_factory=list, init=False)
     code_carbon_callback: CodeCarbonCallback | None = field(default=None, init=False)
     citations: dict[str, str] = field(default_factory=dict, init=False)
@@ -333,6 +347,8 @@ class BaseModelCardData(CardData):
     # Utility fields
     first_save: bool = field(default=True, init=False)
     widget_step: int = field(default=-1, init=False)
+    save_dir: str | None = field(default=None, init=False, repr=False)
+    _asset_cache: dict = field(default_factory=dict, init=False, repr=False)
 
     # Computed once, always unchanged
     pipeline_tag: str = field(default="sentence-similarity", init=False)
@@ -519,6 +535,230 @@ class BaseModelCardData(CardData):
                     self.widget.append({"text": random.choice(sentences)})
                 self.predict_example = sentences[:4]
 
+        # If the model supports non-text modalities, set multimodal predict_example
+        if self.model and any(m not in ("text", "message") for m in self.model.modalities):
+            self._set_multimodal_predict_example(dataset)
+
+    def _set_multimodal_predict_example(self, dataset: DatasetDict) -> None:
+        """Override :attr:`predict_example` with multimodal inputs when the model supports non-text modalities.
+
+        Respects the distinction between models that support modalities independently (e.g. CLIP
+        supports text OR image, but not combined) vs models that support combined modalities
+        (e.g. BLIP supports text+image together via a tuple modality ``("image", "text")``).
+
+        - If the model has a **tuple modality** matching the dataset columns, build multimodal dicts
+          (e.g. ``{"text": "...", "image": <PIL.Image>}``).
+        - If the model only supports individual non-text modalities (no matching tuple), pick the
+          **first non-text modality** and show single-modality examples.
+        """
+        sub_dataset = next(iter(dataset.values()))
+        if isinstance(sub_dataset, IterableDataset) or len(sub_dataset) == 0:
+            return
+
+        # Classify dataset columns by modality (no Video feature in datasets library)
+        column_modalities: dict[str, str] = {}
+        for column, feature in sub_dataset.features.items():
+            if column == "dataset_name":
+                continue
+            if isinstance(feature, Value) and feature.dtype in {"string", "large_string"}:
+                column_modalities[column] = "text"
+            elif ImageFeature and isinstance(feature, ImageFeature):
+                column_modalities[column] = "image"
+            elif AudioFeature and isinstance(feature, AudioFeature):
+                column_modalities[column] = "audio"
+
+        available_modalities = set(column_modalities.values())
+
+        # Check if the model has a tuple modality whose parts all match available columns.
+        # E.g. BLIP has ("image", "text") and the dataset has both image and text columns.
+        combined_modality: tuple | None = None
+        for modality in self.model.modalities:
+            if isinstance(modality, tuple) and all(part in available_modalities for part in modality):
+                combined_modality = modality
+                break
+
+        if combined_modality:
+            # Build multimodal dicts using the first column per modality in the tuple
+            selected_columns: dict[str, str] = {}
+            for part in combined_modality:
+                for column, mod in column_modalities.items():
+                    if mod == part and part not in selected_columns:
+                        selected_columns[part] = column
+                        break
+
+            num_examples = min(3, len(sub_dataset))
+            predict_example = []
+            for i in range(num_examples):
+                sample = sub_dataset[i]
+                predict_example.append({mod: sample[col] for mod, col in selected_columns.items()})
+            self.predict_example = predict_example
+            return
+
+        # No combined modality: pick the first non-text modality that both the model
+        # and the dataset support, and show single-modality examples.
+        for modality in self.model.modalities:
+            if isinstance(modality, str) and modality not in ("text", "message") and modality in available_modalities:
+                col = next(c for c, m in column_modalities.items() if m == modality)
+                num_examples = min(3, len(sub_dataset))
+                self.predict_example = [sub_dataset[i][col] for i in range(num_examples)]
+                return
+
+    def save_predict_example_assets(self) -> None:
+        """Save non-text items in :attr:`predict_example` as files in an ``assets/`` subdirectory.
+
+        After saving, :attr:`predict_example_display` is set with the same structure as
+        :attr:`predict_example` but with relative file paths (e.g. ``"assets/image_0.jpg"``)
+        replacing raw data (PIL images, audio dicts, etc.). Text strings are kept as-is.
+
+        This is called during save, after :meth:`run_usage_snippet` encodes the original data.
+        :meth:`generate_usage_snippet` then uses :attr:`predict_example_display` for the code block.
+        """
+        if not self.save_dir or not self.predict_example:
+            return
+
+        # Quick check: if everything is already text (strings or list-of-strings), nothing to save
+        if all(
+            isinstance(item, str) or (isinstance(item, list) and all(isinstance(x, str) for x in item))
+            for item in self.predict_example
+        ):
+            return
+
+        assets_dir = os.path.join(self.save_dir, "assets")
+        os.makedirs(assets_dir, exist_ok=True)
+        counter = 0
+        display = []
+
+        for item in self.predict_example:
+            if isinstance(item, str):
+                display.append(item)
+            elif isinstance(item, list) and all(isinstance(x, str) for x in item):
+                display.append(item)
+            elif isinstance(item, list):
+                # Mixed-type list, e.g. CrossEncoder pair [PIL.Image, "text"]
+                display_list = []
+                for elem in item:
+                    if isinstance(elem, str):
+                        display_list.append(elem)
+                    else:
+                        rel_path = self._save_asset(elem, assets_dir, counter)
+                        if rel_path:
+                            counter += 1
+                            display_list.append(rel_path)
+                        else:
+                            display_list.append(f"<{type(elem).__name__}>")
+                display.append(display_list)
+            elif isinstance(item, dict) and not self._is_typed_media_dict(item):
+                # Multimodal input dict, e.g. {"text": "...", "image": <PIL.Image>}
+                display_dict = {}
+                for key, value in item.items():
+                    if isinstance(value, str):
+                        display_dict[key] = value
+                    else:
+                        rel_path = self._save_asset(value, assets_dir, counter, hint=key)
+                        if rel_path:
+                            counter += 1
+                            display_dict[key] = rel_path
+                        else:
+                            display_dict[key] = f"<{type(value).__name__}>"
+                display.append(display_dict)
+            else:
+                # Single non-text item (PIL Image, AudioDict, VideoDict, array, ...)
+                rel_path = self._save_asset(item, assets_dir, counter)
+                if rel_path:
+                    counter += 1
+                    display.append(rel_path)
+                else:
+                    display.append(f"<{type(item).__name__}>")
+
+        self.predict_example_display = display
+
+    @staticmethod
+    def _is_typed_media_dict(item: dict) -> bool:
+        """Check if a dict is an AudioDict or VideoDict (vs a multimodal input dict)."""
+        return isinstance(item, dict) and "array" in item and ("sampling_rate" in item or "video_metadata" in item)
+
+    @staticmethod
+    def _hash_asset(value: Any) -> int | None:
+        """Compute a content hash for an asset value, or None if the type is not supported."""
+        if PILImage and isinstance(value, PILImage):
+            return hash((value.tobytes(), value.size, value.mode))
+        if isinstance(value, dict) and "array" in value:
+            import numpy as np
+
+            array = value["array"]
+            if isinstance(array, torch.Tensor):
+                array = array.cpu().numpy()
+            if isinstance(array, np.ndarray):
+                return hash((array.tobytes(), array.shape, value.get("sampling_rate")))
+        return None
+
+    def _save_asset(self, value: Any, assets_dir: str, idx: int, hint: str = "") -> str | None:
+        """Save a non-text value to the assets directory, deduplicating by content hash.
+
+        Returns the relative path (e.g. ``"assets/image_0.jpg"``) on success, or ``None`` on failure.
+        """
+        content_hash = self._hash_asset(value)
+        if content_hash is not None and content_hash in self._asset_cache:
+            return self._asset_cache[content_hash]
+
+        os.makedirs(assets_dir, exist_ok=True)
+
+        # PIL Image
+        if PILImage and isinstance(value, PILImage):
+            filename = f"image_{idx}.jpg"
+            rel_path = f"assets/{filename}"
+            value.convert("RGB").save(os.path.join(assets_dir, filename))
+            if content_hash is not None:
+                self._asset_cache[content_hash] = rel_path
+            return rel_path
+
+        # AudioDict: {"array": ..., "sampling_rate": ...}
+        if isinstance(value, dict) and "array" in value and "sampling_rate" in value:
+            try:
+                import soundfile as sf
+
+                filename = f"audio_{idx}.wav"
+                rel_path = f"assets/{filename}"
+                sf.write(os.path.join(assets_dir, filename), value["array"], value["sampling_rate"])
+                if content_hash is not None:
+                    self._asset_cache[content_hash] = rel_path
+                return rel_path
+            except Exception:
+                pass
+
+        # VideoDict: {"array": ..., "video_metadata": ...} - save as mp4
+        if isinstance(value, dict) and "array" in value and "video_metadata" in value:
+            try:
+                from torchcodec.encoders import VideoEncoder
+
+                array = value["array"]
+                if not isinstance(array, torch.Tensor):
+                    array = torch.as_tensor(array)
+                # VideoEncoder expects (N, C, H, W) uint8
+                if array.ndim == 5:
+                    array = array[0]
+                if array.ndim == 4 and array.shape[-1] in (1, 3, 4):
+                    # (T, H, W, C) -> (T, C, H, W)
+                    array = array.permute(0, 3, 1, 2)
+                if array.dtype != torch.uint8:
+                    if array.is_floating_point() and array.max() <= 1.0:
+                        array = (array * 255).clamp(0, 255).to(torch.uint8)
+                    else:
+                        array = array.clamp(0, 255).to(torch.uint8)
+
+                fps = value.get("video_metadata", {}).get("fps", 24)
+                filename = f"video_{idx}.mp4"
+                rel_path = f"assets/{filename}"
+                VideoEncoder(array.cpu(), frame_rate=fps).to_file(os.path.join(assets_dir, filename))
+                if content_hash is not None:
+                    self._asset_cache[content_hash] = rel_path
+                return rel_path
+            except Exception:
+                pass
+
+        logger.warning(f"Could not save predict example asset of type {type(value).__name__}")
+        return None
+
     def set_evaluation_metrics(
         self, evaluator: BaseEvaluator, metrics: dict[str, Any], epoch: int = 0, step: int = 0
     ) -> None:
@@ -694,7 +934,38 @@ class BaseModelCardData(CardData):
                             },
                         }
                 else:
-                    dataset_info["stats"][column] = {"dtype": fullname(first), "data": {}}
+                    # Handle non-text types: PIL Images, Audio dicts, etc.
+                    if PILImage and isinstance(first, PILImage):
+                        widths = [img.width for img in subsection if isinstance(img, PILImage)]
+                        heights = [img.height for img in subsection if isinstance(img, PILImage)]
+                        dataset_info["stats"][column] = {
+                            "dtype": "image",
+                            "data": {
+                                "min": f"{min(widths)}x{min(heights)} px",
+                                "mean": f"{sum(widths) // len(widths)}x{sum(heights) // len(heights)} px",
+                                "max": f"{max(widths)}x{max(heights)} px",
+                            },
+                        }
+                    elif isinstance(first, dict) and "array" in first and "sampling_rate" in first:
+                        durations = [
+                            len(d["array"]) / d["sampling_rate"]
+                            for d in subsection
+                            if isinstance(d, dict) and "array" in d and "sampling_rate" in d
+                        ]
+                        if durations:
+                            dataset_info["stats"][column] = {
+                                "dtype": "audio",
+                                "data": {
+                                    "min": f"{min(durations):.2f}s",
+                                    "mean": f"{sum(durations) / len(durations):.2f}s",
+                                    "max": f"{max(durations):.2f}s",
+                                    "sampling_rate": f"{first['sampling_rate']} Hz",
+                                },
+                            }
+                        else:
+                            dataset_info["stats"][column] = {"dtype": "audio", "data": {}}
+                    else:
+                        dataset_info["stats"][column] = {"dtype": fullname(first), "data": {}}
 
             def to_html_list(data: dict):
                 return "<ul><li>" + "</li><li>".join(f"{key}: {value}" for key, value in data.items()) + "</li></ul>"
@@ -706,23 +977,8 @@ class BaseModelCardData(CardData):
             dataset_info["stats_table"] = indent(make_markdown_table(stats_lines).replace("-:|", "--|"), "  ")
 
             dataset_info["examples"] = dataset[:3]
-            num_samples = len(dataset_info["examples"][list(dataset_info["examples"])[0]])
-            examples_lines = []
-            for sample_idx in range(num_samples):
-                columns = {}
-                for column in dataset_columns:
-                    value = dataset_info["examples"][column][sample_idx]
-                    # If the value is a long list, truncate it
-                    if isinstance(value, list) and len(value) > 5:
-                        value = str(value[:5])[:-1] + ", ...]"
-                    # If the value is a really long string, truncate it
-                    if isinstance(value, str) and len(value) > 1000:
-                        value = value[:1000] + "..."
-                    # Avoid newlines and | in the table
-                    value = str(value).replace("\n", "<br>").replace("|", "\\|")
-                    columns[column] = f"<code>{value}</code>"
-                examples_lines.append(columns)
-            dataset_info["examples_table"] = indent(make_markdown_table(examples_lines).replace("-:|", "--|"), "  ")
+            dataset_info["_example_columns"] = dataset_columns
+            dataset_info["examples_table"], _ = self._render_examples_table(dataset_info)
 
         dataset_info["loss"] = {
             "fullname": fullname(loss),
@@ -1043,6 +1299,239 @@ class BaseModelCardData(CardData):
         with torch._tensor_str.printoptions(precision=4, sci_mode=False):
             self.similarities = "\n".join(f"# {line}" for line in str(similarity.cpu()).splitlines())
 
+    def generate_usage_snippet(self) -> str:
+        """Generate the Python usage code snippet for the model card.
+
+        Returns the code block (including \\`\\`\\` delimiters) showing how to use this model.
+        Called after :meth:`run_usage_snippet` has set :attr:`predict_example` and :attr:`similarities`.
+
+        Subclasses can override this to generate snippets for different model types (e.g. IR models,
+        cross-encoders) or multimodal inputs.
+        """
+        # Use display version (with file paths) if available, otherwise original predict_example
+        display = self.predict_example_display or self.predict_example
+        if not display:
+            return self._generate_text_snippet(display)
+
+        # Check the *original* predict_example for modality detection, since display converts
+        # non-text items (PIL images, audio dicts, etc.) to file path strings.
+        source = self.predict_example or display
+        has_non_text = any(not isinstance(item, (str, list)) for item in source)
+        if has_non_text:
+            return self._generate_non_text_snippet(display)
+
+        return self._generate_text_snippet(display)
+
+    def _generate_text_snippet(self, display: list[str] | None) -> str:
+        """Generate a text-only usage snippet."""
+        model_class = getattr(self, "_snippet_model_class", "SentenceTransformer")
+        default_model_id = getattr(self, "_snippet_default_model_id", "sentence_transformers_model_id")
+        model_id = self.model_id or default_model_id
+        examples = display or [
+            "The weather is lovely today.",
+            "It's so sunny outside!",
+            "He drove to the stadium.",
+        ]
+        output_dim = self._get_snippet_output_dimensionality()
+
+        lines = [
+            f"from sentence_transformers import {model_class}",
+            "",
+            "# Download from the 🤗 Hub",
+            f'model = {model_class}("{model_id}")',
+            "# Run inference",
+            "sentences = [",
+        ]
+        for text in examples:
+            lines.append(f"    {text!r},")
+        lines.extend(
+            [
+                "]",
+                "embeddings = model.encode(sentences)",
+                "print(embeddings.shape)",
+                f"# [{len(examples)}, {output_dim}]",
+                "",
+                "# Get the similarity scores for the embeddings",
+                "similarities = model.similarity(embeddings, embeddings)",
+            ]
+        )
+        if self.similarities:
+            lines.append("print(similarities)")
+            lines.append(self.similarities)
+        else:
+            lines.extend(
+                [
+                    "print(similarities.shape)",
+                    f"# [{len(examples)}, {len(examples)}]",
+                ]
+            )
+
+        return "```python\n" + "\n".join(lines) + "\n```"
+
+    def _generate_non_text_snippet(self, display: list[str | dict[str, str]]) -> str:
+        """Generate a usage snippet for non-text inputs (multimodal dicts or single-modality items)."""
+        model_class = getattr(self, "_snippet_model_class", "SentenceTransformer")
+        default_model_id = getattr(self, "_snippet_default_model_id", "sentence_transformers_model_id")
+        model_id = self.model_id or default_model_id
+        output_dim = self._get_snippet_output_dimensionality()
+
+        lines = [
+            f"from sentence_transformers import {model_class}",
+            "",
+            "# Download from the 🤗 Hub",
+            f'model = {model_class}("{model_id}")',
+            "# Run inference",
+            "inputs = [",
+        ]
+        for item in display:
+            lines.append(f"    {self._format_snippet_value(item)},")
+        lines.extend(
+            [
+                "]",
+                "embeddings = model.encode(inputs)",
+                "print(embeddings.shape)",
+                f"# [{len(display)}, {output_dim}]",
+                "",
+                "# Get the similarity scores for the embeddings",
+                "similarities = model.similarity(embeddings, embeddings)",
+            ]
+        )
+        if self.similarities:
+            lines.append("print(similarities)")
+            lines.append(self.similarities)
+        else:
+            lines.extend(
+                [
+                    "print(similarities.shape)",
+                    f"# [{len(display)}, {len(display)}]",
+                ]
+            )
+
+        return "```python\n" + "\n".join(lines) + "\n```"
+
+    def _render_examples_table(self, dataset_info: dict, asset_counter: int = 0) -> tuple[str, int]:
+        """Render the examples table for a dataset, saving non-text values as assets when possible.
+
+        Returns:
+            A tuple of ``(rendered_table, new_asset_counter)``. The counter should be passed to
+            subsequent calls to avoid filename collisions across datasets.
+        """
+        dataset_columns = dataset_info["_example_columns"]
+        num_samples = len(dataset_info["examples"][list(dataset_info["examples"])[0]])
+        examples_lines = []
+        for sample_idx in range(num_samples):
+            columns = {}
+            for column in dataset_columns:
+                value = dataset_info["examples"][column][sample_idx]
+                cell, asset_counter = self._format_and_save_example(value, asset_counter)
+                columns[column] = cell
+            examples_lines.append(columns)
+        return indent(make_markdown_table(examples_lines).replace("-:|", "--|"), "  "), asset_counter
+
+    def _format_and_save_example(self, value: Any, counter: int) -> tuple[str, int]:
+        """Format a dataset example value for the model card table, saving non-text values as assets.
+
+        When :attr:`save_dir` is set, PIL images are saved to ``assets/`` and rendered inline via
+        ``<img>`` tags. Audio is saved as ``.wav`` and linked. Otherwise falls back to text placeholders.
+
+        Returns:
+            A tuple of ``(html_cell_content, new_counter)``.
+        """
+        if PILImage and isinstance(value, PILImage):
+            if self.save_dir:
+                content_hash = self._hash_asset(value)
+                if content_hash is not None and content_hash in self._asset_cache:
+                    rel_path = self._asset_cache[content_hash]
+                    return f'<img src="{rel_path}" width="200">', counter
+                assets_dir = os.path.join(self.save_dir, "assets")
+                os.makedirs(assets_dir, exist_ok=True)
+                filename = f"example_image_{counter}.jpg"
+                rel_path = f"assets/{filename}"
+                value.convert("RGB").save(os.path.join(assets_dir, filename))
+                if content_hash is not None:
+                    self._asset_cache[content_hash] = rel_path
+                return f'<img src="{rel_path}" width="200">', counter + 1
+            return f"<code>{self._format_example_value(value)}</code>", counter
+
+        if isinstance(value, dict) and "array" in value and "sampling_rate" in value:
+            if self.save_dir:
+                try:
+                    import soundfile as sf
+
+                    content_hash = self._hash_asset(value)
+                    if content_hash is not None and content_hash in self._asset_cache:
+                        rel_path = self._asset_cache[content_hash]
+                        duration = len(value["array"]) / value["sampling_rate"]
+                        return (
+                            f'<audio controls src="{rel_path}"><code>&lt;audio {duration:.2f}s&gt;</code></audio>',
+                            counter,
+                        )
+                    assets_dir = os.path.join(self.save_dir, "assets")
+                    os.makedirs(assets_dir, exist_ok=True)
+                    filename = f"example_audio_{counter}.wav"
+                    rel_path = f"assets/{filename}"
+                    sf.write(os.path.join(assets_dir, filename), value["array"], value["sampling_rate"])
+                    duration = len(value["array"]) / value["sampling_rate"]
+                    if content_hash is not None:
+                        self._asset_cache[content_hash] = rel_path
+                    return (
+                        f'<audio controls src="{rel_path}"><code>&lt;audio {duration:.2f}s&gt;</code></audio>',
+                        counter + 1,
+                    )
+                except Exception:
+                    pass
+            return f"<code>{self._format_example_value(value)}</code>", counter
+
+        return f"<code>{self._format_example_value(value)}</code>", counter
+
+    @staticmethod
+    def _format_example_value(value: Any) -> str:
+        """Format a dataset example value for the model card examples table."""
+        if PILImage and isinstance(value, PILImage):
+            return f"&lt;image {value.width}x{value.height}&gt;"
+        if isinstance(value, dict) and "array" in value and "sampling_rate" in value:
+            duration = len(value["array"]) / value["sampling_rate"]
+            return f"&lt;audio {duration:.2f}s @ {value['sampling_rate']} Hz&gt;"
+        if isinstance(value, dict) and "array" in value and "video_metadata" in value:
+            return "&lt;video&gt;"
+        if isinstance(value, list) and len(value) > 5:
+            return str(value[:5])[:-1] + ", ...]"
+        if isinstance(value, str) and len(value) > 1000:
+            return value[:1000] + "..."
+        result = str(value).replace("\n", "<br>").replace("|", "\\|")
+        return result
+
+    def _format_snippet_value(self, value: Any) -> str:
+        """Format a value for inclusion in a code snippet.
+
+        Strings are shown as repr (quoted), and asset paths are converted to Hub URLs
+        when model_id is available. Dicts and lists are formatted recursively so that
+        nested asset paths also get URL conversion.
+        """
+        if isinstance(value, str) and value.startswith("assets/"):
+            return repr(self._asset_path_to_url(value))
+        if isinstance(value, dict):
+            parts = ", ".join(f"{k!r}: {self._format_snippet_value(v)}" for k, v in value.items())
+            return f"{{{parts}}}"
+        if isinstance(value, list):
+            elems = ", ".join(self._format_snippet_value(v) for v in value)
+            return f"[{elems}]"
+        return repr(value)
+
+    def _asset_path_to_url(self, relative_path: str) -> str:
+        """Convert a relative asset path to a Hub URL if model_id is available, otherwise keep relative."""
+        if self.model_id:
+            return f"https://huggingface.co/{self.model_id}/resolve/main/{relative_path}"
+        return relative_path
+
+    def _get_snippet_output_dimensionality(self) -> int | str:
+        if self.model:
+            try:
+                return self.model.get_embedding_dimension()
+            except Exception:
+                pass
+        return "?"
+
     def get_codecarbon_data(self) -> dict[Literal["co2_eq_emissions"], dict[str, Any]]:
         emissions_data = self.code_carbon_callback.tracker._prepare_emissions_data()
         results = {
@@ -1063,19 +1552,11 @@ class BaseModelCardData(CardData):
         return results
 
     def get_model_specific_metadata(self) -> dict[str, Any]:
-        similarity_fn_name = "Cosine Similarity"
-        if self.model.similarity_fn_name:
-            similarity_fn_name = {
-                "cosine": "Cosine Similarity",
-                "dot": "Dot Product",
-                "euclidean": "Euclidean Distance",
-                "manhattan": "Manhattan Distance",
-            }.get(self.model.similarity_fn_name, self.model.similarity_fn_name.replace("_", " ").title())
+        supported_modalities = [format_modality(m).title() for m in self.model.modalities]
         return {
             "model_max_length": self.model.get_max_seq_length(),
-            "output_dimensionality": self.model.get_embedding_dimension(),
             "model_string": str(self.model),
-            "similarity_fn_name": similarity_fn_name,
+            "supported_modalities": supported_modalities,
         }
 
     def get_default_model_name(self) -> None:
@@ -1102,7 +1583,40 @@ class BaseModelCardData(CardData):
         except Exception as exc:
             logger.warning(f"Error while computing usage snippet output: {exc}")
 
+        # Clear asset cache so deduplication works within a single save but doesn't persist stale paths
+        self._asset_cache = {}
+
+        # Save non-text predict example assets (images, audio, etc.) to the assets/ directory.
+        # Must run after run_usage_snippet() (which encodes the original data) and before
+        # generate_usage_snippet() (which needs the file paths).
+        try:
+            self.save_predict_example_assets()
+        except Exception as exc:
+            logger.warning(f"Error while saving predict example assets: {exc}")
+
+        # Re-render dataset example tables now that save_dir is available for asset saving.
+        # The tables were first rendered during Trainer init (compute_dataset_metrics) when
+        # save_dir was not yet set, so non-text values got placeholder text instead of saved files.
+        if self.save_dir:
+            example_asset_counter = 0
+            for dataset_list in (self.train_datasets, self.eval_datasets):
+                for dataset_info in dataset_list:
+                    if "examples" in dataset_info and "_example_columns" in dataset_info:
+                        try:
+                            dataset_info["examples_table"], example_asset_counter = self._render_examples_table(
+                                dataset_info, example_asset_counter
+                            )
+                        except Exception as exc:
+                            logger.warning(f"Error while re-rendering examples table: {exc}")
+
         super_dict = {field.name: getattr(self, field.name) for field in fields(self)}
+
+        # Generate the usage snippet code block
+        try:
+            super_dict["usage_snippet"] = self.generate_usage_snippet()
+        except Exception as exc:
+            logger.warning(f"Error while generating usage snippet: {exc}")
+            super_dict["usage_snippet"] = ""
 
         # Compute required formats from the (usually post-training) evaluation data
         if self.eval_results_dict:

@@ -409,9 +409,10 @@ class Transformer(InputModule):
             - ``"sequence-classification"``: :class:`~transformers.AutoModelForSequenceClassification`,
               used by :class:`~sentence_transformers.CrossEncoder`.
             - ``"text-generation"``: :class:`~transformers.AutoModelForCausalLM`, used by generative
-              :class:`~sentence_transformers.CrossEncoder` models.
+              :class:`~sentence_transformers.CrossEncoder` models. Sets the ``tokenizer`` padding_side to "left".
             - ``"any-to-any"``: ``AutoModelForMultimodalLM``, for multimodal generative
-              :class:`~sentence_transformers.CrossEncoder` models (requires transformers v5+).
+              :class:`~sentence_transformers.CrossEncoder` models (requires transformers v5+). Sets the
+              ``tokenizer`` padding_side to "left".
             - ``"fill-mask"``: :class:`~transformers.AutoModelForMaskedLM`, used by
               :class:`~sentence_transformers.SparseEncoder`.
 
@@ -584,6 +585,11 @@ class Transformer(InputModule):
                         self.tokenizer.do_lower_case = do_lower_case
                     except AttributeError:
                         self.tokenizer.basic_tokenizer.do_lower_case = do_lower_case
+
+        # Causal models require left padding so the last position is always a real token,
+        # which is needed for logits_to_keep=1 and CausalScoreHead.
+        if self.transformer_task in ("text-generation", "any-to-any"):
+            self.processor.padding_side = "left"
 
         self.input_formatter = InputFormatter(
             model_type=self.config.model_type, message_format=self.message_format, processor=self.processor
@@ -806,6 +812,16 @@ class Transformer(InputModule):
         processor_output["modality"] = modality
         if prompt_length is not None:
             processor_output["prompt_length"] = prompt_length
+
+        if self.transformer_task in ("text-generation", "any-to-any"):
+            if self.processor.padding_side != "left":
+                raise ValueError(
+                    f"The processor padding side is {self.processor.padding_side!r}, but causal models require "
+                    "left padding so that the last token position is always a real token. "
+                    "This is needed for efficient logit computation (logits_to_keep=1) and for CausalScoreHead. "
+                    'Please set ``processing_kwargs={"padding_side": "left"}``.'
+                )
+            processor_output["logits_to_keep"] = 1
 
         return processor_output
 

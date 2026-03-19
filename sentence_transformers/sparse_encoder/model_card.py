@@ -63,6 +63,9 @@ class SparseEncoderModelCardData(BaseModelCardData):
         ... )
     """
 
+    _snippet_model_class = "SparseEncoder"
+    _snippet_default_model_id = "sparse_encoder_model_id"
+
     # Potentially provided by the user
     task_name: str = field(default=None)
     tags: list[str] | None = field(
@@ -111,6 +114,7 @@ class SparseEncoderModelCardData(BaseModelCardData):
         self.model_type = " ".join(model_type)
 
     def get_model_specific_metadata(self) -> dict[str, Any]:
+        metadata = super().get_model_specific_metadata()
         similarity_fn_name = "Dot Product"
         if self.model.similarity_fn_name:
             similarity_fn_name = {
@@ -119,13 +123,14 @@ class SparseEncoderModelCardData(BaseModelCardData):
                 "euclidean": "Euclidean Distance",
                 "manhattan": "Manhattan Distance",
             }.get(self.model.similarity_fn_name, self.model.similarity_fn_name.replace("_", " ").title())
-        return {
-            "model_max_length": self.model.get_max_seq_length(),
-            "output_dimensionality": self.model.get_embedding_dimension(),
-            "model_string": str(self.model),
-            "similarity_fn_name": similarity_fn_name,
-            "max_active_dims": getattr(self.model, "max_active_dims", None),
-        }
+        metadata.update(
+            {
+                "output_dimensionality": self.model.get_embedding_dimension(),
+                "similarity_fn_name": similarity_fn_name,
+                "max_active_dims": getattr(self.model, "max_active_dims", None),
+            }
+        )
+        return metadata
 
     def get_default_model_name(self) -> None:
         return self.model_type

@@ -9,6 +9,7 @@ import shutil
 import sys
 import tempfile
 import traceback
+import warnings
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from multiprocessing import Queue
@@ -551,7 +552,6 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
         .. deprecated::
             `tokenize` is deprecated and will be removed in a future version. Use `preprocess` instead.
         """
-        import warnings
 
         warnings.warn(
             "The `tokenize` method is deprecated and will be removed in a future version. "
@@ -723,6 +723,9 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
             model_path = Path(model_name)
             if not model_path.exists() and not self.model_card_data.model_id:
                 self.model_card_data.model_id = model_name
+
+        # Set the save directory so that assets (images, audio, etc.) can be saved alongside the model
+        self.model_card_data.save_dir = path
 
         # If we loaded a model from the Hub, and no training was done, then
         # we don't generate a new model card, but reuse the old one instead.

@@ -104,6 +104,8 @@ class CrossEncoderNanoBEIREvaluator(BaseEvaluator):
             the positives that are already in the documents list. Always set to True if your ``samples`` contain ``negative``
             instead of ``documents``. When using ``documents``, setting this to True will result in a more useful evaluation
             signal, but setting it to False will result in a more realistic evaluation. Defaults to True.
+        prompt_name (str, optional): The name of the prompt to use when calling ``model.predict()``.
+            Must be a key in the model's ``prompts`` dictionary. Defaults to None.
         batch_size (int): Batch size to compute sentence embeddings. Defaults to 64.
         show_progress_bar (bool): Show progress bar when computing embeddings. Defaults to False.
         write_csv (bool): Write results to CSV file. Defaults to True.
@@ -199,6 +201,7 @@ class CrossEncoderNanoBEIREvaluator(BaseEvaluator):
         rerank_k: int = 100,
         at_k: int = 10,
         always_rerank_positives: bool = True,
+        prompt_name: str | None = None,
         batch_size: int = 32,
         show_progress_bar: bool = False,
         write_csv: bool = True,
@@ -214,8 +217,9 @@ class CrossEncoderNanoBEIREvaluator(BaseEvaluator):
         self.rerank_k = rerank_k
         self.at_k = at_k
         self.always_rerank_positives = always_rerank_positives
-        self.show_progress_bar = show_progress_bar
+        self.prompt_name = prompt_name
         self.batch_size = batch_size
+        self.show_progress_bar = show_progress_bar
         self.write_csv = write_csv
         self.aggregate_fn = aggregate_fn
         self.aggregate_key = aggregate_key
@@ -227,6 +231,7 @@ class CrossEncoderNanoBEIREvaluator(BaseEvaluator):
         reranking_kwargs = {
             "at_k": self.at_k,
             "always_rerank_positives": self.always_rerank_positives,
+            "prompt_name": self.prompt_name,
             "show_progress_bar": self.show_progress_bar,
             "batch_size": self.batch_size,
             "write_csv": self.write_csv,

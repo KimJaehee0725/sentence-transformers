@@ -8,6 +8,7 @@ from sentence_transformers import SparseEncoderTrainer, SparseEncoderTrainingArg
 from sentence_transformers.base.model_card import generate_model_card
 from sentence_transformers.sparse_encoder import SparseEncoder
 from sentence_transformers.sparse_encoder.losses import SparseMultipleNegativesRankingLoss, SpladeLoss
+from sentence_transformers.sparse_encoder.model_card import SparseEncoderModelCardData
 from sentence_transformers.util import is_datasets_available, is_training_available
 
 if is_datasets_available():
@@ -242,3 +243,27 @@ def test_model_card_set_transform(
     # Pre-transform column names should not appear as column headers
     for substring in ["<code>anchor</code>", "<code>positive</code>", "<code>negative</code>"]:
         assert substring not in model_card
+
+
+class TestGenerateUsageSnippetSparseEncoder:
+    """Verify SparseEncoder uses its own class name in usage snippets."""
+
+    def test_sparse_encoder_class_name(self) -> None:
+        data = SparseEncoderModelCardData()
+        data.predict_example = ["A", "B"]
+        data.similarities = None
+        data.model = None
+        snippet = data.generate_usage_snippet()
+
+        assert "from sentence_transformers import SparseEncoder" in snippet
+        assert 'SparseEncoder("sparse_encoder_model_id")' in snippet
+        assert "SentenceTransformer" not in snippet
+
+    def test_sparse_encoder_custom_model_id(self) -> None:
+        data = SparseEncoderModelCardData(model_id="my-org/my-sparse-model")
+        data.predict_example = ["test"]
+        data.similarities = None
+        data.model = None
+        snippet = data.generate_usage_snippet()
+
+        assert 'SparseEncoder("my-org/my-sparse-model")' in snippet

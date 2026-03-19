@@ -24,6 +24,9 @@ This is a [sentence-transformers](https://www.SBERT.net) model{% if base_model %
 - **Maximum Sequence Length:** {{ model_max_length }} tokens
 - **Output Dimensionality:** {{ output_dimensionality }} dimensions
 - **Similarity Function:** {{ similarity_fn_name }}
+{% if supported_modalities -%}
+    - **Supported Modalit{{"ies" if supported_modalities | length > 1 else "y"}}:** {{ supported_modalities | join(", ") }}
+{%- endif %}
 {% if train_datasets | selectattr("name") | list -%}
     - **Training Dataset{{"s" if train_datasets | selectattr("name") | list | length > 1 else ""}}:**
     {%- for dataset in (train_datasets | selectattr("name")) %}
@@ -73,57 +76,8 @@ First install the Sentence Transformers library:
 ```bash
 pip install -U sentence-transformers
 ```
-{% if not ir_model %}
 Then you can load this model and run inference.
-```python
-from sentence_transformers import SentenceTransformer
-
-# Download from the {{ hf_emoji }} Hub
-model = SentenceTransformer("{{ model_id | default('sentence_transformers_model_id', true) }}")
-# Run inference
-sentences = [
-{%- for text in (predict_example or ["The weather is lovely today.", "It's so sunny outside!", "He drove to the stadium."]) %}
-    {{ "%r" | format(text) }},
-{%- endfor %}
-]
-embeddings = model.encode(sentences)
-print(embeddings.shape)
-# [{{ (predict_example or ["The weather is lovely today.", "It's so sunny outside!", "He drove to the stadium."]) | length}}, {{ output_dimensionality | default(1024, true) }}]
-
-# Get the similarity scores for the embeddings
-similarities = model.similarity(embeddings, embeddings)
-{% if similarities %}print(similarities)
-{{ similarities }}{% else %}print(similarities.shape)
-# [{{ (predict_example or ["The weather is lovely today.", "It's so sunny outside!", "He drove to the stadium."]) | length}}, {{ (predict_example or ["The weather is lovely today.", "It's so sunny outside!", "He drove to the stadium."]) | length}}]{% endif %}
-```
-{% else %}
-Then you can load this model and run inference.
-```python
-from sentence_transformers import SentenceTransformer
-
-# Download from the {{ hf_emoji }} Hub
-model = SentenceTransformer("{{ model_id | default('sentence_transformers_model_id', true) }}")
-# Run inference
-queries = [
-    {{ predict_example | first | tojson }},
-]
-documents = [
-{%- for text in predict_example[1:] %}
-    {{ "%r" | format(text) }},
-{%- endfor %}
-]
-query_embeddings = model.encode_query(queries)
-document_embeddings = model.encode_document(documents)
-print(query_embeddings.shape, document_embeddings.shape)
-# [1, {{ output_dimensionality | default(1024, true) }}] [{{ (predict_example | length) - 1 }}, {{ output_dimensionality | default(1024, true) }}]
-
-# Get the similarity scores for the embeddings
-similarities = model.similarity(query_embeddings, document_embeddings)
-{% if similarities %}print(similarities)
-{{ similarities }}{% else %}print(similarities.shape)
-# [1, {{ (predict_example | length) - 1 }}]{% endif %}
-```
-{% endif %}
+{{ usage_snippet }}
 <!--
 ### Direct Usage (Transformers)
 

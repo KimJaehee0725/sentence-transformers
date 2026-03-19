@@ -665,7 +665,7 @@ class CrossEncoder(BaseModel, FitMixin):
             if activation_fn is not None:
                 scores = activation_fn(scores)
 
-            # NOTE: This is just backwards compatibility with the code below, we can optimize this
+            # TODO: This is just backwards compatibility with the code below, we can optimize this
             if scores.ndim == 1:
                 scores = scores.unsqueeze(1)
 

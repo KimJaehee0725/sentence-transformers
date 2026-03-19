@@ -50,6 +50,8 @@ class CrossEncoderRerankingEvaluator(BaseEvaluator):
             instead of ``documents``. When using ``documents``, setting this to True will result in a more useful evaluation
             signal, but setting it to False will result in a more realistic evaluation. Defaults to True.
         name (str, optional): Name of the evaluator, used for logging, saving in a CSV, and the model card. Defaults to "".
+        prompt_name (str, optional): The name of the prompt to use when calling ``model.predict()``.
+            Must be a key in the model's ``prompts`` dictionary. Defaults to None.
         batch_size (int): Batch size to compute sentence embeddings. Defaults to 64.
         show_progress_bar (bool): Show progress bar when computing embeddings. Defaults to False.
         write_csv (bool): Write results to CSV file. Defaults to True.
@@ -106,6 +108,7 @@ class CrossEncoderRerankingEvaluator(BaseEvaluator):
         at_k: int = 10,
         always_rerank_positives: bool = True,  # TODO: This is also confusing, perhaps setting=""
         name: str = "",
+        prompt_name: str | None = None,
         batch_size: int = 64,
         show_progress_bar: bool = False,
         write_csv: bool = True,
@@ -121,6 +124,7 @@ class CrossEncoderRerankingEvaluator(BaseEvaluator):
         self.always_rerank_positives = always_rerank_positives
 
         self.name = name
+        self.prompt_name = prompt_name
         self.batch_size = batch_size
         self.show_progress_bar = show_progress_bar
 
@@ -213,6 +217,7 @@ class CrossEncoderRerankingEvaluator(BaseEvaluator):
         if all_pairs:
             all_pred_scores = model.predict(
                 all_pairs,
+                prompt_name=self.prompt_name,
                 batch_size=self.batch_size,
                 convert_to_numpy=True,
                 show_progress_bar=self.show_progress_bar,

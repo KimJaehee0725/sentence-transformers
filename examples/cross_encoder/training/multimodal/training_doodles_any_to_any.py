@@ -1,22 +1,27 @@
 """
-This example trains a multimodal CrossEncoder on the doodles-captions-manual dataset,
-learning to match images with their correct text captions (and vice versa) using
-BinaryCrossEntropyLoss with multi-dataset training.
+This example trains a multimodal CrossEncoder reranker on the doodles-captions-manual dataset
+using a causal LM with CausalScoreHead. CausalScoreHead works by generating a single token
+and comparing the logits for "1" (match) vs "0" (no match) to produce a score.
 
-Two sub-datasets are created:
+The model learns to match images with their correct text captions (and vice versa) using
+BinaryCrossEntropyLoss with multi-dataset training. Two sub-datasets are created:
 - image_to_text: given an image query, rerank text candidates
 - text_to_image: given a text query, rerank image candidates
 
 Each sample is expanded with negatives at a 1:4 positive-to-negative ratio.
 
+See also ``training_doodles_feature_extraction.py`` for an alternative approach that uses
+Pooling + Dense instead of CausalScoreHead. That variant extracts the last token's hidden state
+and projects it to a score via a Dense layer, avoiding the expensive LM head computation over
+the full vocabulary. Both approaches produce comparable results.
+
 Usage:
-python training_doodles.py
+    python training_doodles_any_to_any.py
 """
 
 import logging
 import random
 import traceback
-from datetime import datetime
 
 from datasets import load_dataset
 
@@ -28,38 +33,50 @@ from sentence_transformers.cross_encoder.training_args import CrossEncoderTraini
 from sentence_transformers.modules import CausalScoreHead, Transformer
 
 logging.basicConfig(format="%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
-# TODO: Ignore all httpx INFO logs
 
 # Config
-train_batch_size = 4
+train_batch_size = 8
+eval_batch_size = 32
 num_epochs = 1
 neg_to_pos_ratio = 4  # 4 negatives per positive
-num_eval_negatives = 10
+num_eval_negatives = 100
 eval_fraction = 0.1
 seed = 42
-output_dir = "output/training_ce_doodles-" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 # 1. Load the model
-# NOTE: It's recommended to use ``pip install kernels`` to avoid having to install the separate ``flash_attn`` package
 model_name = "Qwen/Qwen3.5-0.8B"
+
+# Transformer with "any-to-any" task: loads the full causal LM (with LM head) so the model
+# can generate tokens. add_generation_prompt=True appends the assistant turn start token,
+# so the model generates from the right position.
+# NOTE: ``pip install kernels`` is recommended to avoid installing the separate ``flash_attn`` package
 transformer = Transformer(
     model_name,
     transformer_task="any-to-any",
     model_kwargs={"torch_dtype": "bfloat16", "device_map": "auto", "attn_implementation": "flash_attention_2"},
     processing_kwargs={"chat_template": {"add_generation_prompt": True}},
 )
+
+# Extend the chat template to accept "query" and "document" roles (used by CrossEncoder)
+# in addition to the standard "user" role.
 transformer.processor.chat_template = transformer.processor.chat_template.replace(
     'message.role == "user"', 'message.role in ["user", "query", "document"]'
 )
+
+# CausalScoreHead: generates one token and computes score = log(P("1")) - log(P("0")),
+# i.e. the log-odds that the query-document pair is a match.
 score_head = CausalScoreHead(
     true_token_id=transformer.tokenizer.convert_tokens_to_ids("1"),
     false_token_id=transformer.tokenizer.convert_tokens_to_ids("0"),
 )
+
 model = CrossEncoder(
     modules=[transformer, score_head],
     num_labels=1,
-    prompts={"default": "Judge whether the image and text match. Respond with 1 if they match, 0 if they don't."},
-    default_prompt_name="default",
+    prompts={
+        "image_to_text": "Given the image, judge whether the text matches it. Respond with 1 if they match, 0 if they don't.",
+        "text_to_image": "Given the text, judge whether the image matches it. Respond with 1 if they match, 0 if they don't.",
+    },
 )
 
 # 2. Load dataset and create train/eval split
@@ -120,36 +137,44 @@ eval_images = eval_split["image"]
 eval_texts = eval_split["text"]
 
 rng = random.Random(seed)
-
 image_to_text_samples = []
 for i in range(len(eval_split)):
+    neg_indices = rng.sample(
+        [j for j in range(len(eval_texts)) if j != i], min(num_eval_negatives, len(eval_texts) - 1)
+    )
     image_to_text_samples.append(
         {
             "query": eval_images[i],
             "positive": [eval_texts[i]],
-            "negative": [eval_texts[j] for j in range(len(eval_texts)) if j != i],
+            "negative": [eval_texts[j] for j in neg_indices],
         }
     )
-
 text_to_image_samples = []
 for i in range(len(eval_split)):
+    neg_indices = rng.sample(
+        [j for j in range(len(eval_images)) if j != i], min(num_eval_negatives, len(eval_images) - 1)
+    )
     text_to_image_samples.append(
         {
             "query": eval_texts[i],
             "positive": [eval_images[i]],
-            "negative": [eval_images[j] for j in range(len(eval_images)) if j != i],
+            "negative": [eval_images[j] for j in neg_indices],
         }
     )
 
 image_to_text_evaluator = CrossEncoderRerankingEvaluator(
     samples=image_to_text_samples,
     name="doodles-image-to-text-eval",
+    prompt_name="image_to_text",
+    batch_size=eval_batch_size,
     show_progress_bar=True,
 )
 
 text_to_image_evaluator = CrossEncoderRerankingEvaluator(
     samples=text_to_image_samples,
     name="doodles-text-to-image-eval",
+    prompt_name="text_to_image",
+    batch_size=eval_batch_size,
     show_progress_bar=True,
 )
 
@@ -163,13 +188,18 @@ loss = BinaryCrossEntropyLoss(model)
 
 # 6. Training arguments
 short_model_name = model_name.split("/")[-1]
-run_name = f"reranker-{short_model_name}-doodles-image-text-to-text"
+run_name = f"reranker-{short_model_name}-doodles-any-to-any"
 args = CrossEncoderTrainingArguments(
-    output_dir=output_dir,
+    output_dir=f"models/{run_name}",
     num_train_epochs=num_epochs,
     per_device_train_batch_size=train_batch_size,
-    per_device_eval_batch_size=train_batch_size,
-    prompts=model.prompts.get("default"),
+    per_device_eval_batch_size=eval_batch_size,
+    prompts={
+        "image_to_text": model.prompts["image_to_text"],
+        "text_to_image": model.prompts["text_to_image"],
+    },
+    gradient_accumulation_steps=4,
+    seed=seed,
     warmup_ratio=0.1,
     learning_rate=5e-6,
     fp16=False,
@@ -187,14 +217,8 @@ args = CrossEncoderTrainingArguments(
 trainer = CrossEncoderTrainer(
     model=model,
     args=args,
-    train_dataset={
-        "image_to_text": train_image_to_text,
-        "text_to_image": train_text_to_image,
-    },
-    eval_dataset={
-        "image_to_text": eval_image_to_text,
-        "text_to_image": eval_text_to_image,
-    },
+    train_dataset={"image_to_text": train_image_to_text, "text_to_image": train_text_to_image},
+    eval_dataset={"image_to_text": eval_image_to_text, "text_to_image": eval_text_to_image},
     loss=loss,
     evaluator=[image_to_text_evaluator, text_to_image_evaluator],
 )
@@ -206,7 +230,7 @@ image_to_text_evaluator(model)
 text_to_image_evaluator(model)
 
 # 9. Save model
-final_output_dir = f"{output_dir}/final"
+final_output_dir = f"models/{run_name}/final"
 model.save_pretrained(final_output_dir)
 
 # 10. (Optional) Push to Hub
