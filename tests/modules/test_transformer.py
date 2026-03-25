@@ -719,6 +719,31 @@ class TestSerialization:
         config = json.loads(config_path.read_text())
         assert "processing_kwargs" not in config
 
+    def test_unpad_inputs_omitted_from_config_when_inferred(self, bert_tiny_transformer, tmp_path):
+        """Inferred unpad_inputs (None) should not appear in the saved config JSON."""
+        assert bert_tiny_transformer.unpad_inputs is None
+        save_dir = str(tmp_path / "model")
+        bert_tiny_transformer.save(save_dir)
+
+        config_path = Path(save_dir) / "sentence_bert_config.json"
+        config = json.loads(config_path.read_text())
+        assert "unpad_inputs" not in config
+
+    @pytest.mark.parametrize("unpad_inputs", [True, False])
+    def test_unpad_inputs_save_load_roundtrip(self, tmp_path, unpad_inputs):
+        """Explicitly set unpad_inputs should appear in the saved config and survive a roundtrip."""
+        transformer = Transformer(TINY_BERT, unpad_inputs=unpad_inputs)
+        assert transformer.unpad_inputs is unpad_inputs
+        save_dir = str(tmp_path / "model")
+        transformer.save(save_dir)
+
+        config_path = Path(save_dir) / "sentence_bert_config.json"
+        config = json.loads(config_path.read_text())
+        assert config["unpad_inputs"] is unpad_inputs
+
+        reloaded = Transformer.load(save_dir)
+        assert reloaded.unpad_inputs is unpad_inputs
+
     def test_get_config_dict(self, bert_tiny_transformer):
         config = bert_tiny_transformer.get_config_dict()
         assert "modality_config" in config
