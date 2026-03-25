@@ -24,9 +24,10 @@ except ImportError:
     Image = None
 
 try:
-    from torchcodec.decoders import AudioDecoder
+    from torchcodec.decoders import AudioDecoder, VideoDecoder
 except ImportError:
     AudioDecoder = None  # type: ignore[assignment,misc]
+    VideoDecoder = None  # type: ignore[assignment,misc]
 
 logger = logging.getLogger(__name__)
 
@@ -227,11 +228,24 @@ class InputFormatter:
                 value = item["array"]
                 extra_modality_kwargs["audio"]["sampling_rate"] = item["sampling_rate"]
             elif modality == "audio" and AudioDecoder is not None and isinstance(item, AudioDecoder):
-                value = item["array"]  # type: ignore[index]
-                extra_modality_kwargs["audio"]["sampling_rate"] = item["sampling_rate"]  # type: ignore[index]
+                samples = item.get_all_samples()
+                # AudioDecoder returns (channels, samples); mean over channels to get 1D numpy
+                value = samples.data.mean(dim=0).numpy()
+                extra_modality_kwargs["audio"]["sampling_rate"] = samples.sample_rate
             elif modality == "video" and isinstance(item, dict):
                 value = item["array"]
                 extra_modality_kwargs["video"].setdefault("video_metadata", []).append(item["video_metadata"])
+            elif modality == "video" and VideoDecoder is not None and isinstance(item, VideoDecoder):
+                num_frames = len(item)
+                frame_batch = item.get_frames_in_range(0, num_frames)
+                value = frame_batch.data
+                extra_modality_kwargs["video"].setdefault("video_metadata", []).append(
+                    {
+                        "fps": item.metadata.average_fps,
+                        "total_num_frames": item.metadata.num_frames,
+                        "frames_indices": list(range(frame_batch.data.shape[0])),
+                    }
+                )
             elif modality == "message" and isinstance(item, dict):
                 value = [item]
             else:
@@ -471,13 +485,14 @@ def infer_modality(
         ValueError: If the input type/structure is not recognized.
     """
     # Not a part of the match statement as it would match None if PIL is not installed
-    # TODO: What if Image is just a dummy class if the import fails? Then we can put this in the match statement
     if Image is not None and isinstance(sample, Image):
         return "image"
 
-    # AudioDecoder from torchcodec/datasets supports dict-like ["array"]/["sampling_rate"] access
     if AudioDecoder is not None and isinstance(sample, AudioDecoder):
         return "audio"
+
+    if VideoDecoder is not None and isinstance(sample, VideoDecoder):
+        return "video"
 
     match sample:
         case str() if is_image_url_or_path(sample):

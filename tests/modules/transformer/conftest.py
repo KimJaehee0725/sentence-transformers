@@ -19,8 +19,9 @@ from sentence_transformers.modules import Transformer
 from tests.utils import is_ci
 
 try:
-    from torchcodec.decoders import VideoDecoder
+    from torchcodec.decoders import AudioDecoder, VideoDecoder
 except ImportError:
+    AudioDecoder = None
     VideoDecoder = None
 
 try:
@@ -294,13 +295,18 @@ def get_sample_audio(n: int = 2) -> dict[str, list[Any]]:
         # Fallback if soundfile not available
         paths = urls[:n]
 
-    return {
+    result = {
         # "url": urls,  # Rarely supported currently
         "array": arrays,
         # "tensor": tensors,  # Tensors is not supported in the generic transformers feature_extraction
         "dict": audio_dicts,
         # "path": paths,  # Rarely supported currently
     }
+
+    if AudioDecoder is not None and sf is not None:
+        result["audio_decoder"] = [AudioDecoder(path) for path in paths]
+
+    return result
 
 
 @lru_cache(maxsize=4)
@@ -351,6 +357,8 @@ def get_sample_video(n: int = 2) -> dict[str, list[Any]]:
             result["array"] = arrays
         if tensors:
             result["tensor"] = tensors
+
+        result["video_decoder"] = [VideoDecoder(path) for path in paths]
 
     return result
 
