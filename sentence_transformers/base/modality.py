@@ -19,9 +19,9 @@ from sentence_transformers.base.modality_types import (
 )
 
 try:
-    from PIL.Image import Image
+    from PIL.Image import Image as PILImage
 except ImportError:
-    Image = None
+    PILImage = None
 
 try:
     from torchcodec.decoders import AudioDecoder, VideoDecoder
@@ -485,7 +485,7 @@ def infer_modality(
         ValueError: If the input type/structure is not recognized.
     """
     # Not a part of the match statement as it would match None if PIL is not installed
-    if Image is not None and isinstance(sample, Image):
+    if PILImage is not None and isinstance(sample, PILImage):
         return "image"
 
     if AudioDecoder is not None and isinstance(sample, AudioDecoder):

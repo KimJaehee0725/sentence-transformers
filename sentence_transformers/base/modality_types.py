@@ -8,9 +8,9 @@ import numpy as np
 import torch
 
 try:
-    from PIL.Image import Image
+    from PIL.Image import Image as PILImage
 except ImportError:
-    Image = None
+    PILImage = None
 
 try:
     from torchcodec.decoders import AudioDecoder, VideoDecoder
@@ -37,7 +37,7 @@ class MessageDict(TypedDict):
 
 # Per-modality input types: each defines the accepted formats for a single modality
 TextInput: TypeAlias = str
-ImageInput: TypeAlias = str | Image | np.ndarray | torch.Tensor
+ImageInput: TypeAlias = str | PILImage | np.ndarray | torch.Tensor
 AudioInput: TypeAlias = str | np.ndarray | torch.Tensor | AudioDict | AudioDecoder
 VideoInput: TypeAlias = str | np.ndarray | torch.Tensor | VideoDict | VideoDecoder
 MessageInput: TypeAlias = MessageDict | list[MessageDict]

@@ -441,9 +441,9 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
 
         # PIL Image -> pixel count
         try:
-            from PIL.Image import Image
+            from PIL.Image import Image as PILImage
 
-            if isinstance(sample, Image):
+            if isinstance(sample, PILImage):
                 return sample.size[0] * sample.size[1]
         except ImportError:
             pass
