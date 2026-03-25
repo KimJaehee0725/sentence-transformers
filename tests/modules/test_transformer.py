@@ -438,24 +438,27 @@ class TestGetEmbeddingDimension:
         dim = bert_tiny_transformer.get_embedding_dimension()
         assert dim == bert_tiny_transformer.config.hidden_size
 
-    def test_hidden_sizes_list(self, bert_tiny_transformer):
+    def test_hidden_sizes_list(self, bert_tiny_transformer, monkeypatch):
         """Models with hidden_sizes (list) should return the last element."""
         model = bert_tiny_transformer
-        del model.config.hidden_size
+        monkeypatch.delattr(model.config, "hidden_size", raising=False)
+        monkeypatch.delattr(type(model.config), "hidden_size", raising=False)
         model.config.hidden_sizes = [64, 128, 256]
         assert model.get_embedding_dimension() == 256
 
-    def test_hidden_dim(self, bert_tiny_transformer):
+    def test_hidden_dim(self, bert_tiny_transformer, monkeypatch):
         """Models with hidden_dim should return it."""
         model = bert_tiny_transformer
-        del model.config.hidden_size
+        monkeypatch.delattr(model.config, "hidden_size", raising=False)
+        monkeypatch.delattr(type(model.config), "hidden_size", raising=False)
         model.config.hidden_dim = 384
         assert model.get_embedding_dimension() == 384
 
-    def test_raises_when_no_dimension_found(self, bert_tiny_transformer):
+    def test_raises_when_no_dimension_found(self, bert_tiny_transformer, monkeypatch):
         """Should raise ValueError when no dimension attribute is found."""
         model = bert_tiny_transformer
-        del model.config.hidden_size
+        monkeypatch.delattr(model.config, "hidden_size", raising=False)
+        monkeypatch.delattr(type(model.config), "hidden_size", raising=False)
         with pytest.raises(ValueError, match="Could not determine embedding dimension"):
             model.get_embedding_dimension()
 
