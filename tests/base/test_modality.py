@@ -933,3 +933,68 @@ class TestParseInputsPairs:
         assert len(img_pair_msgs) == 2
         assert img_pair_msgs[0]["role"] == "query"
         assert img_pair_msgs[1]["role"] == "document"
+
+
+class TestIsTextOnlyMessages:
+    def test_flat_text_only(self):
+        """Flat format messages with string content are text-only."""
+        batch = [[{"role": "user", "content": "hello"}]]
+        assert InputFormatter.is_text_only_messages(batch) is True
+
+    def test_structured_text_only(self):
+        """Structured format messages with only text items are text-only."""
+        batch = [[{"role": "user", "content": [{"type": "text", "text": "hello"}]}]]
+        assert InputFormatter.is_text_only_messages(batch) is True
+
+    def test_structured_text_implicit_type(self):
+        """Structured items without an explicit 'type' key default to text."""
+        batch = [[{"role": "user", "content": [{"text": "hello"}]}]]
+        assert InputFormatter.is_text_only_messages(batch) is True
+
+    def test_structured_with_image(self):
+        """Messages containing an image item are not text-only."""
+        batch = [
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "url": "https://example.com/img.jpg"},
+                        {"type": "text", "text": "describe this"},
+                    ],
+                }
+            ]
+        ]
+        assert InputFormatter.is_text_only_messages(batch) is False
+
+    def test_structured_with_audio(self):
+        """Messages containing an audio item are not text-only."""
+        batch = [[{"role": "user", "content": [{"type": "audio", "url": "https://example.com/a.wav"}]}]]
+        assert InputFormatter.is_text_only_messages(batch) is False
+
+    def test_mixed_batch_one_multimodal(self):
+        """A batch is not text-only if any sample contains non-text content."""
+        batch = [
+            [{"role": "user", "content": "pure text"}],
+            [{"role": "user", "content": [{"type": "image", "url": "https://example.com/img.jpg"}]}],
+        ]
+        assert InputFormatter.is_text_only_messages(batch) is False
+
+    def test_empty_batch(self):
+        """An empty batch is trivially text-only."""
+        assert InputFormatter.is_text_only_messages([]) is True
+
+    def test_content_not_str_or_list(self):
+        """Non-string, non-list content is treated as non-text."""
+        batch = [[{"role": "user", "content": 42}]]
+        assert InputFormatter.is_text_only_messages(batch) is False
+
+    def test_multiple_text_messages(self):
+        """Multi-turn text-only conversations are text-only."""
+        batch = [
+            [
+                {"role": "user", "content": "question"},
+                {"role": "assistant", "content": "answer"},
+                {"role": "user", "content": "follow-up"},
+            ]
+        ]
+        assert InputFormatter.is_text_only_messages(batch) is True

@@ -384,6 +384,31 @@ class InputFormatter:
             messages.append(self.to_message(typed_input))  # type: ignore[arg-type]
         return "message", {"message": messages}
 
+    @staticmethod
+    def is_text_only_messages(messages_batch: list[list[dict[str, Any]]]) -> bool:
+        """Check whether all messages in a batch contain only text content.
+
+        Works with both flat format (``{"content": "hello"}``) and structured format
+        (``{"content": [{"type": "text", "text": "hello"}]}``).
+
+        Args:
+            messages_batch: List of message lists, one per sample.
+
+        Returns:
+            True if every message contains only text, False if any contain non-text content.
+        """
+        for messages in messages_batch:
+            for message in messages:
+                content = message.get("content")
+                if isinstance(content, str):
+                    continue
+                if isinstance(content, list):
+                    if any(item.get("type", "text") != "text" for item in content):
+                        return False
+                else:
+                    return False
+        return True
+
     def normalize_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Normalize messages to the target format (``self.message_format``).
 

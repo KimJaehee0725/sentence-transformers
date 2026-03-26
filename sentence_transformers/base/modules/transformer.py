@@ -486,13 +486,14 @@ class Transformer(InputModule):
             ``"token_embeddings"``, ``"scores"``). Required when ``modality_config`` is provided.
             Defaults to None.
         message_format (str, optional): How to handle message-format inputs. Defaults to ``"auto"``.
-        unpad_inputs (bool, optional): Controls whether inputs are concatenated without padding for
-            faster inference using flash attention's variable-length functions. If ``None`` (default),
-            unpadding is enabled automatically when all prerequisites are met (flash attention with
-            variable-length support, ``"torch"`` backend, ``"feature-extraction"`` task). Set to
-            ``False`` to force padding, which is needed for architectures that don't support unpadded
-            inputs (e.g. ``qwen2_vl``). Set to ``True`` to request unpadding explicitly; a warning is
-            logged if the prerequisites are not met. Defaults to None.
+        unpad_inputs (bool, optional): Controls whether text-only inputs are concatenated without
+            padding for faster inference using flash attention's variable-length functions. Non-text
+            inputs (images, audio, video) are always padded normally. If ``None`` (default), unpadding
+            is enabled automatically when all prerequisites are met (flash attention with variable-length
+            support, ``"torch"`` backend, ``"feature-extraction"`` task). Set to ``False`` to force
+            padding, which is needed for architectures that don't support unpadded inputs (e.g.
+            ``qwen2_vl``). Set to ``True`` to request unpadding explicitly; a warning is logged if the
+            prerequisites are not met. Defaults to None.
         max_seq_length (int, optional): Truncate any inputs longer than this value. Prefer setting
             ``model_max_length`` via ``processor_kwargs`` instead. Defaults to None.
         do_lower_case (bool, optional): If true, lowercases the input (independent of whether the model
@@ -672,8 +673,9 @@ class Transformer(InputModule):
 
     @property
     def unpad_inputs(self) -> bool | None:
-        """Whether inputs are concatenated without padding for faster inference.
+        """Whether text-only inputs are concatenated without padding for faster inference.
 
+        Non-text inputs (images, audio, video) are always padded normally.
         ``None`` auto-detects, ``False`` forces padding, ``True`` requests unpadding.
         Re-evaluates on every assignment, so it can be changed after loading::
 
@@ -686,39 +688,43 @@ class Transformer(InputModule):
     def unpad_inputs(self, value: bool | None) -> None:
         self._unpad_inputs = value
         if value is False:
-            self.use_flattened_inputs = False
+            self.can_flatten_inputs = False
         else:
-            self.use_flattened_inputs = self._can_flatten_inputs()
-            if value is True and not self.use_flattened_inputs:
+            self.can_flatten_inputs = self._can_flatten_inputs()
+            if value is True and not self.can_flatten_inputs:
                 logger.warning(
                     "unpad_inputs=True was set, but the prerequisites for skipping padding are not met. "
                     "Falling back to padded inputs."
                 )
 
     def _can_flatten_inputs(self) -> bool:
-        """Determine whether inputs can be flattened (concatenated without padding) for more efficient inference.
+        """Determine whether text-only inputs can be flattened (concatenated without padding) for more efficient inference.
 
-        When enabled, inputs are concatenated into a single sequence and processed using flash attention's
-        variable-length functions, eliminating padding overhead and significantly speeding up inference.
+        When enabled, text-only inputs are concatenated into a single sequence and processed using flash
+        attention's variable-length functions, eliminating padding overhead and significantly speeding up
+        inference. Non-text inputs (images, audio, video) are always padded normally, even when this
+        returns True.
 
         This requires:
         1. The ``"feature-extraction"`` task, as model heads (e.g. ``AutoModelForSequenceClassification``)
            are incompatible with flattened inputs.
-        2. All modality call methods must be ``"forward"``; ``get_..._features`` methods apply heads
+        2. The ``"text"`` modality must be supported by the model.
+        3. All modality call methods must be ``"forward"``; ``get_..._features`` methods apply heads
            that are incompatible with flattened inputs.
-        3. The ``"torch"`` backend with an attention-interface-compatible model.
-        4. Flash attention with variable-length function support.
+        4. The ``"torch"`` backend with an attention-interface-compatible model.
+        5. Flash attention with variable-length function support.
 
         Note: Some architectures don't work with unpadded inputs (e.g. ``qwen2_vl``). Use
         ``unpad_inputs=False`` to disable this optimization for such models.
 
         Returns:
-            bool: True if inputs can be flattened for efficient inference.
+            bool: True if text-only inputs can be flattened for efficient inference.
         """
         if (
             self.transformer_task != "feature-extraction"
+            or "text" not in self.modality_config
             or self.backend != "torch"
-            or not self.auto_model.is_backend_compatible()
+            or not self.model.is_backend_compatible()
             or any(params["method"] != "forward" for params in self.modality_config.values())
         ):
             return False
@@ -728,8 +734,8 @@ class Transformer(InputModule):
             from transformers.modeling_flash_attention_utils import lazy_import_flash_attention
             from transformers.utils.generic import is_flash_attention_requested
         except ImportError:
-            logger.warning_once(
-                "Consider upgrading to transformers >= 5.0.0 to skip padding, "
+            logger.debug(
+                "Consider upgrading to transformers >= 5.0.0 to skip padding for text-only inputs, "
                 "which can significantly speed up processing."
             )
             return False
@@ -738,8 +744,8 @@ class Transformer(InputModule):
         if is_flash_attention_requested(requested_attention_implementation=attn_implementation):
             (_, flash_varlen_fn, *_), _ = lazy_import_flash_attention(attn_implementation)
             if flash_varlen_fn is not None:
-                logger.info(
-                    "Using flattened inputs with flash attention variable-length functions to avoid padding overhead."
+                logger.debug(
+                    "Using flattened inputs with flash attention variable-length functions to avoid padding overhead for text-only inputs."
                 )
                 self.data_collator = DataCollatorWithFlattening(
                     return_seq_idx=True,  # Not always necessary, perhaps only Mamba/Bamba?
@@ -845,18 +851,21 @@ class Transformer(InputModule):
             if overrides := self.processing_kwargs.get(modality_key):  # type: ignore[arg-type]
                 modality_kwargs[modality_key].update(overrides)
 
-        # Flatten inputs to avoid padding overhead when using flash attention variable-length functions.
-        if self.use_flattened_inputs:
-            del common_kwargs["return_tensors"]
-            for kwargs in modality_kwargs.values():
-                kwargs.pop("padding", None)
-            modality_kwargs["text"]["return_attention_mask"] = False
-            modality_kwargs["audio"]["return_attention_mask"] = False
-
         modality, processor_inputs, extra_modality_kwargs = self.input_formatter.parse_inputs(inputs)
 
         for modality_key, extra_kwargs in extra_modality_kwargs.items():
             modality_kwargs[modality_key].update(extra_kwargs)
+
+        # Flatten inputs to avoid padding overhead when using flash attention variable-length functions.
+        # Only safe for text-only inputs, since DataCollatorWithFlattening only handles input_ids/labels.
+        should_flatten = self.can_flatten_inputs and (
+            modality == "text"
+            or (modality == "message" and self.input_formatter.is_text_only_messages(processor_inputs["message"]))
+        )
+        if should_flatten:
+            del common_kwargs["return_tensors"]
+            modality_kwargs["text"].pop("padding", None)
+            modality_kwargs["text"]["return_attention_mask"] = False
 
         # Always convert to the message format if it's supported, since it's most flexible with e.g. defaults
         if "message" in self.modality_config and modality != "message":
@@ -881,8 +890,7 @@ class Transformer(InputModule):
 
         processor_output = self._call_processor(modality, processor_inputs, modality_kwargs, common_kwargs)
 
-        # Flatten inputs to avoid padding overhead when using flash attention variable-length functions.
-        if self.use_flattened_inputs:
+        if should_flatten:
             # DataCollatorWithFlattening expects list[dict], but the processor returns dict[str, list].
             per_sample = [dict(zip(processor_output, values)) for values in zip(*processor_output.values())]
             processor_output = self.data_collator(per_sample)
@@ -1143,7 +1151,7 @@ class Transformer(InputModule):
                     messages,
                     tokenize=True,
                     return_dict=True,
-                    return_tensors=common_kwargs.get("return_tensors", "pt"),
+                    return_tensors=common_kwargs.get("return_tensors"),
                     load_audio_from_video=modality_kwargs["video"].get("load_audio_from_video", False),
                     processor_kwargs={
                         "text_kwargs": modality_kwargs["text"],

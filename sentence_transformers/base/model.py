@@ -366,16 +366,16 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
         """Returns the last module of this sequential embedder"""
         return self._modules[next(reversed(self._modules))]
 
-    def _uses_flattened_inputs(self) -> bool:
-        """Check if the first module (Transformer or Router containing Transformers) uses flattened inputs."""
+    def _can_flatten_inputs(self) -> bool:
+        """Check if the first module (Transformer or Router containing Transformers) supports flattened text-only inputs."""
         first = self[0]
         if isinstance(first, Transformer):
-            return first.use_flattened_inputs
+            return first.can_flatten_inputs
         if isinstance(first, Router):
             for route in first.sub_modules.values():
                 # Each route is nn.Sequential; the first child is the Transformer
                 first_in_route = next(iter(route.children()))
-                if isinstance(first_in_route, Transformer) and first_in_route.use_flattened_inputs:
+                if isinstance(first_in_route, Transformer) and first_in_route.can_flatten_inputs:
                     return True
         return False
 
@@ -384,8 +384,8 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
         """Interleave a largest-to-smallest sorted index array so that each consecutive batch
         contains a mix of long and short inputs.
 
-        With flattened inputs (flash attention), there is no padding. Total tokens per batch
-        equals the sum of actual lengths. Grouping all long inputs together creates peak-memory
+        When text-only inputs are flattened via flash attention, there is no padding. Total tokens per
+        batch equals the sum of actual lengths. Grouping all long inputs together creates peak-memory
         batches, while grouping all short inputs together under-utilises the GPU. Interleaving
         (largest, smallest, 2nd largest, 2nd smallest, ...) balances the total token count
         across batches for more uniform memory usage.

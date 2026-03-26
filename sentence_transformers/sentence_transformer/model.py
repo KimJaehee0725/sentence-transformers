@@ -629,7 +629,7 @@ class SentenceTransformer(BaseModel, FitMixin):
         truncate_dim = truncate_dim if truncate_dim is not None else self.truncate_dim
         all_embeddings = []
         length_sorted_idx = np.argsort([-self._input_length(sen) for sen in inputs])
-        if self._uses_flattened_inputs():
+        if self._can_flatten_inputs():
             length_sorted_idx = self._interleave_sorted_indices(length_sorted_idx)
         inputs_sorted = [inputs[idx] for idx in length_sorted_idx]
 

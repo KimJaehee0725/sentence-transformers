@@ -4,6 +4,7 @@ import json
 import logging
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -1022,7 +1023,7 @@ class TestCanFlattenInputs:
         """Flattening requires the feature-extraction task."""
         transformer = Transformer(TINY_BERT, transformer_task="sequence-classification")
         assert transformer._can_flatten_inputs() is False
-        assert transformer.use_flattened_inputs is False
+        assert transformer.can_flatten_inputs is False
 
     def test_false_for_non_torch_backend(self):
         """Flattening requires the torch backend."""
@@ -1031,19 +1032,19 @@ class TestCanFlattenInputs:
         except (ImportError, Exception):
             pytest.skip("ONNX backend not available")
         assert transformer._can_flatten_inputs() is False
-        assert transformer.use_flattened_inputs is False
+        assert transformer.can_flatten_inputs is False
 
     def test_false_when_no_flash_attention(self):
         """Without flash attention, flattening should be disabled."""
         transformer = Transformer(TINY_BERT)
         # Default attn_implementation is not flash_attention_2
         assert transformer._can_flatten_inputs() is False
-        assert transformer.use_flattened_inputs is False
+        assert transformer.can_flatten_inputs is False
 
     def test_false_when_backend_incompatible(self, monkeypatch):
         """If the model's auto_model reports backend incompatibility, flattening is disabled."""
         transformer = Transformer(TINY_BERT)
-        monkeypatch.setattr(transformer.auto_model, "is_backend_compatible", lambda: False)
+        monkeypatch.setattr(transformer.model, "is_backend_compatible", lambda: False)
         assert transformer._can_flatten_inputs() is False
 
     @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
@@ -1059,20 +1060,20 @@ class TestCanFlattenInputs:
             model_kwargs={"attn_implementation": "flash_attention_2", "torch_dtype": torch.bfloat16},
         )
         assert transformer._can_flatten_inputs() is True
-        assert transformer.use_flattened_inputs is True
+        assert transformer.can_flatten_inputs is True
         assert transformer.data_collator is not None
 
     def test_unpad_inputs_false_forces_padding(self):
         """Setting unpad_inputs=False should disable flattening regardless of prerequisites."""
         transformer = Transformer(TINY_BERT, unpad_inputs=False)
         assert transformer.unpad_inputs is False
-        assert transformer.use_flattened_inputs is False
+        assert transformer.can_flatten_inputs is False
 
     def test_unpad_inputs_true_warns_when_prerequisites_not_met(self, caplog):
         """Setting unpad_inputs=True should warn if prerequisites are not met."""
         with caplog.at_level(logging.WARNING):
             transformer = Transformer(TINY_BERT, unpad_inputs=True)
-        assert transformer.use_flattened_inputs is False
+        assert transformer.can_flatten_inputs is False
         assert "unpad_inputs=True was set" in caplog.text
 
     def test_unpad_inputs_none_auto_detects(self):
@@ -1080,22 +1081,103 @@ class TestCanFlattenInputs:
         transformer = Transformer(TINY_BERT)
         assert transformer.unpad_inputs is None
         # Without flash attention, auto-detect should disable flattening
-        assert transformer.use_flattened_inputs is False
+        assert transformer.can_flatten_inputs is False
 
     def test_unpad_inputs_setter_re_evaluates(self):
-        """Setting unpad_inputs after init should re-evaluate use_flattened_inputs."""
+        """Setting unpad_inputs after init should re-evaluate can_flatten_inputs."""
         transformer = Transformer(TINY_BERT)
-        assert transformer.use_flattened_inputs is False
+        assert transformer.can_flatten_inputs is False
 
         # Setting to False explicitly should keep it disabled
         transformer.unpad_inputs = False
         assert transformer.unpad_inputs is False
-        assert transformer.use_flattened_inputs is False
+        assert transformer.can_flatten_inputs is False
 
         # Setting back to None should re-evaluate (still False without flash attention)
         transformer.unpad_inputs = None
         assert transformer.unpad_inputs is None
-        assert transformer.use_flattened_inputs is False
+        assert transformer.can_flatten_inputs is False
+
+
+class TestConditionalFlattening:
+    """Test that preprocess only flattens text-only inputs, even when can_flatten_inputs is True."""
+
+    @pytest.fixture()
+    def flatten_ready_transformer(self):
+        """A BERT transformer with can_flatten_inputs=True and a mock data_collator."""
+        transformer = Transformer(TINY_BERT)
+        transformer.can_flatten_inputs = True
+        transformer.data_collator = MagicMock(
+            return_value={"input_ids": torch.tensor([1, 2, 3]), "position_ids": torch.tensor([0, 1, 2])}
+        )
+        return transformer
+
+    def test_text_inputs_are_flattened(self, flatten_ready_transformer):
+        """Text inputs should be flattened when can_flatten_inputs is True."""
+        flatten_ready_transformer.preprocess(["hello world", "another sentence"])
+        flatten_ready_transformer.data_collator.assert_called_once()
+
+    def test_text_inputs_not_flattened_when_disabled(self):
+        """Text inputs should NOT be flattened when can_flatten_inputs is False."""
+        transformer = Transformer(TINY_BERT)
+        assert transformer.can_flatten_inputs is False
+        transformer.data_collator = MagicMock()
+        transformer.preprocess(["hello world"])
+        transformer.data_collator.assert_not_called()
+
+    def test_multimodal_messages_skip_flattening(self, flatten_ready_transformer, monkeypatch):
+        """Messages with non-text content should NOT be flattened even when can_flatten_inputs is True."""
+        transformer = flatten_ready_transformer
+        transformer.modality_config["message"] = {"method": "forward"}
+
+        multimodal_messages = [
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "url": "https://example.com/img.jpg"},
+                        {"type": "text", "text": "describe"},
+                    ],
+                }
+            ]
+        ]
+        monkeypatch.setattr(
+            transformer.input_formatter,
+            "parse_inputs",
+            lambda inputs: ("message", {"message": multimodal_messages}, {}),
+        )
+        monkeypatch.setattr(
+            transformer,
+            "_call_processor",
+            lambda modality, inputs, modality_kwargs, common_kwargs: {
+                "input_ids": torch.tensor([[1, 2, 3]]),
+                "attention_mask": torch.tensor([[1, 1, 1]]),
+            },
+        )
+
+        result = transformer.preprocess(["dummy"])
+        transformer.data_collator.assert_not_called()
+        assert "attention_mask" in result
+
+    def test_text_only_messages_are_flattened(self, flatten_ready_transformer, monkeypatch):
+        """Messages with only text content should be flattened when can_flatten_inputs is True."""
+        transformer = flatten_ready_transformer
+        transformer.modality_config["message"] = {"method": "forward"}
+
+        text_messages = [[{"role": "user", "content": "hello world"}]]
+        monkeypatch.setattr(
+            transformer.input_formatter,
+            "parse_inputs",
+            lambda inputs: ("message", {"message": text_messages}, {}),
+        )
+        monkeypatch.setattr(
+            transformer,
+            "_call_processor",
+            lambda modality, inputs, modality_kwargs, common_kwargs: {"input_ids": [[1, 2, 3]]},
+        )
+
+        transformer.preprocess(["dummy"])
+        transformer.data_collator.assert_called_once()
 
 
 @pytest.mark.skipif(
