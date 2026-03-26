@@ -588,7 +588,7 @@ def test_prompts(splade_bert_tiny_model: SparseEncoder, caplog: pytest.LogCaptur
         )
         assert len(caplog.record_tuples) == 1
         assert (
-            caplog.record_tuples[0][2] == "Encode with either a `prompt`, a `prompt_name`, or neither, but not both. "
+            caplog.record_tuples[0][2] == "Provide either a `prompt`, a `prompt_name`, or neither, but not both. "
             "Ignoring the `prompt_name` in favor of `prompt`."
         )
 

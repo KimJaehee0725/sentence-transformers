@@ -155,10 +155,9 @@ class SparseEncoderTrainer(BaseTrainer):
 
     def get_default_loss(self, model: SparseEncoder) -> torch.nn.Module:
         logger.info(
-            "No `loss` passed, using `sentence_transformers.sparse_encoder.losses.SpladeLoss` as a default option. with "
-            "`SparseMultipleNegativesRankingLoss` as the default loss function."
-            "Be careful, we also set the `query_regularizer_weight` and `document_regularizer_weight`, but these are "
-            "really sensitive parameters and should be tuned for your task."
+            "No `loss` passed, using `SpladeLoss` with `SparseMultipleNegativesRankingLoss` as the default. "
+            "Note: `query_regularizer_weight` and `document_regularizer_weight` are sensitive parameters "
+            "and should be tuned for your task."
         )
         return SpladeLoss(
             model=model,

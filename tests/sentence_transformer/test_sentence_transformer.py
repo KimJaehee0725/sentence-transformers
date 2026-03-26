@@ -167,7 +167,7 @@ def test_push_to_hub(
         )
 
     with pytest.raises(
-        ValueError, match="Providing an `organization` to `save_to_hub` is deprecated. Please only use `repo_id`."
+        ValueError, match="Providing an `organization` to `save_to_hub` is deprecated. Please use `repo_id` instead."
     ):
         model.save_to_hub("sentence-transformers-testing/stsb-bert-tiny-safetensors", organization="unrelated")
 
@@ -185,7 +185,7 @@ def test_push_to_hub(
         )
         assert (
             caplog.record_tuples[1][2]
-            == 'Providing an `organization` to `save_to_hub` is deprecated. Please only use `repo_id="sentence-transformers-testing/stsb-bert-tiny-safetensors"` instead.'
+            == 'Providing an `organization` to `save_to_hub` is deprecated. Please use `repo_id="sentence-transformers-testing/stsb-bert-tiny-safetensors"` instead.'
         )
     mock_upload_folder_kwargs.clear()
 
@@ -343,8 +343,7 @@ def test_prompts(stsb_bert_tiny_model: SentenceTransformer, caplog: pytest.LogCa
             assert np.array_equal(model.encode(texts, prompt=query, prompt_name="query"), prompt_embedding)
             assert len(caplog.record_tuples) == 1
             assert (
-                caplog.record_tuples[0][2]
-                == "Encode with either a `prompt`, a `prompt_name`, or neither, but not both. "
+                caplog.record_tuples[0][2] == "Provide either a `prompt`, a `prompt_name`, or neither, but not both. "
                 "Ignoring the `prompt_name` in favor of `prompt`."
             )
 

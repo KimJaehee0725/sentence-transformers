@@ -648,7 +648,7 @@ class Transformer(InputModule):
                     )
         else:
             self.modality_config, self.module_output_name = self.infer_modalities(self.model, self.processor)
-        logger.info(f"Active modality config: {self.modality_config}")
+        logger.debug(f"Active modality config: {self.modality_config}")
         self.input_formatter.supported_modalities = list(self.modality_config.keys())
 
         if tokenizer_name_or_path is not None:

@@ -214,7 +214,6 @@ class CrossEncoder(BaseModel, FitMixin):
         processor_kwargs: dict[str, Any] | None = None,
         config_kwargs: dict[str, Any] | None = None,
     ) -> tuple[list[nn.Module] | OrderedDict[str, nn.Module], dict[str, Any]]:
-        # TODO: Normalize logs with other architectures
         shared_kwargs = {
             "token": token,
             "trust_remote_code": trust_remote_code,

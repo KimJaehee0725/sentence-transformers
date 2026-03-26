@@ -1037,11 +1037,6 @@ class SentenceTransformer(BaseModel, FitMixin):
         Returns:
             tuple[list[nn.Module] | OrderedDict[str, nn.Module], dict[str, Any]]: A tuple of (modules, config).
         """
-        # TODO: This warning isn't right, we might not use mean pooling, e.g. if the transformer model outputs sentence embeddings directly
-        logger.warning(
-            f"No {self.__class__.__name__} model found with name {model_name_or_path}. Creating a new one with mean pooling."
-        )
-
         shared_kwargs = {
             "token": token,
             "trust_remote_code": trust_remote_code,

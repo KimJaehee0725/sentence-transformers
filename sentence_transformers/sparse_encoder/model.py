@@ -824,11 +824,6 @@ class SparseEncoder(BaseModel):
         Returns:
             tuple[list[nn.Module], dict[str, Any]]: The modules and an empty kwargs dict.
         """
-        logger.warning(
-            f"No sparse-encoder model found with name {model_name_or_path}. "
-            "Creating a new one with default settings compatible with the base model."
-        )
-
         shared_kwargs = {
             "token": token,
             "trust_remote_code": trust_remote_code,
@@ -916,12 +911,6 @@ class SparseEncoder(BaseModel):
                 processor_kwargs=processor_kwargs,
                 config_kwargs=config_kwargs,
             )
-
-        # TODO: Rethink logging message
-        logger.warning(
-            f"No sparse-encoder model found with name {model_name_or_path}. "
-            "Creating a new one with default settings compatible with the base model."
-        )
 
         shared_kwargs = {
             "token": token,

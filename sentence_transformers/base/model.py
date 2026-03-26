@@ -102,7 +102,7 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
             device (str, optional): Device (like ``"cuda"``, ``"cpu"``, ``"mps"``, ``"npu"``) that should be used
                 for computation. If None, checks if a GPU can be used. Defaults to None.
             prompts (dict[str, str], optional): A dictionary with prompts for the model. The key is the prompt
-                name, the value is the prompt text. The prompt text will be prepended before any text to encode.
+                name, the value is the prompt text. The prompt text will be prepended before any text during inference.
                 For example: ``{"query": "query: ", "passage": "passage: "}``. Defaults to None.
             default_prompt_name (str, optional): The name of the prompt that should be used by default. If not
                 set, no prompt will be applied. Defaults to None.
@@ -172,7 +172,7 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
         # Determine device
         if device is None:
             device = get_device_name()
-            logger.info(f"Use pytorch device_name: {device}")
+            logger.info(f"No device provided, using {device}")
 
         if device == "hpu" and importlib.util.find_spec("optimum") is not None:
             from optimum.habana.transformers.modeling_utils import adapt_transformers_to_gaudi
@@ -181,8 +181,6 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
 
         # Load model
         if model_name_or_path is not None and model_name_or_path != "":
-            logger.info(f"Load pretrained {self.__class__.__name__}: {model_name_or_path}")
-
             if not os.path.exists(model_name_or_path):
                 # Not a path, load from hub
                 if "\\" in model_name_or_path or model_name_or_path.count("/") > 1:
@@ -237,10 +235,8 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
             )
 
         if non_empty_keys := [k for k, v in self.prompts.items() if v != ""]:
-            if len(non_empty_keys) == 1:
-                logger.info(f"1 prompt is loaded, with the key: {non_empty_keys[0]}")
-            else:
-                logger.info(f"{len(non_empty_keys)} prompts are loaded, with the keys: {non_empty_keys}")
+            n = len(non_empty_keys)
+            logger.info(f"Loaded {n} prompt{'s' if n > 1 else ''} with these keys: {non_empty_keys}")
         if self.default_prompt_name:
             logger.warning_once(
                 f"Default prompt name is set to '{self.default_prompt_name}'. "
@@ -270,7 +266,7 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
                 prompt = self.prompts.get(self.default_prompt_name, None)
         elif prompt_name is not None:
             logger.warning(
-                "Encode with either a `prompt`, a `prompt_name`, or neither, but not both. "
+                "Provide either a `prompt`, a `prompt_name`, or neither, but not both. "
                 "Ignoring the `prompt_name` in favor of `prompt`."
             )
         return prompt
@@ -322,7 +318,7 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
 
     def get_model_kwargs(self) -> list[str]:
         """
-        Get the keyword arguments specific to this model for the `encode`, `encode_query`, or `encode_document` methods.
+        Get the keyword arguments specific to this model for inference methods like `encode` or `predict`.
 
         Example:
 
@@ -524,7 +520,7 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
                 if isinstance(modality, tuple) and all(part in self.modalities for part in modality):
                     message += (
                         f"\nThis model supports {' and '.join(modality)} individually, "
-                        "but not in the same input. Please encode each modality separately."
+                        "but not in the same input. Please process each modality separately."
                     )
                 raise ValueError(message)
 
@@ -601,7 +597,7 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
 
         os.makedirs(path, exist_ok=True)
 
-        logger.info(f"Save model to {path}")
+        logger.info(f"Saving model to {path}")
         modules_config = []
 
         # Save model-level configuration options
@@ -792,11 +788,11 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
                 repo_id = f"{organization}/{repo_id}"
             elif repo_id.split("/")[0] != organization:
                 raise ValueError(
-                    "Providing an `organization` to `save_to_hub` is deprecated. Please only use `repo_id`."
+                    "Providing an `organization` to `save_to_hub` is deprecated. Please use `repo_id` instead."
                 )
             else:
                 logger.warning(
-                    f'Providing an `organization` to `save_to_hub` is deprecated. Please only use `repo_id="{repo_id}"` instead.'
+                    f'Providing an `organization` to `save_to_hub` is deprecated. Please use `repo_id="{repo_id}"` instead.'
                 )
 
         return self.push_to_hub(
@@ -946,6 +942,7 @@ This pull request has been automatically generated to add {self.__class__.__name
             local_files_only=local_files_only,
         )
         if modules_json_path is None:
+            logger.info(f"No modules.json found for {model_name_or_path}, initializing a new {self.model_type} model.")
             return self._load_default_modules(model_name_or_path, **load_kwargs)
 
         model_type_being_loaded = self._get_model_type(
@@ -956,8 +953,10 @@ This pull request has been automatically generated to add {self.__class__.__name
             local_files_only=local_files_only,
         )
         if model_type_being_loaded == self.model_type:
+            logger.info(f"Loading {self.model_type} model from {model_name_or_path}.")
             return self._load_config_modules(model_name_or_path, **load_kwargs)
 
+        logger.info(f"Converting {model_type_being_loaded} model {model_name_or_path} to {self.model_type}.")
         return self._load_converted_modules(model_name_or_path, **load_kwargs, model_type=model_type_being_loaded)
 
     @abstractmethod
@@ -1039,9 +1038,8 @@ This pull request has been automatically generated to add {self.__class__.__name
                 and version.parse(model_config["__version__"]["sentence_transformers"]) > version.parse(__version__)
             ):
                 logger.warning(
-                    f"You are trying to use a model that was created with Sentence Transformers version {model_config['__version__']['sentence_transformers']}, "
-                    f"but you're currently using version {__version__}. This might cause unexpected behavior or errors. "
-                    "In that case, try to update to the latest version."
+                    f"This model was created with Sentence Transformers version {model_config['__version__']['sentence_transformers']}, "
+                    f"but you're using version {__version__}. Consider updating to the latest version to avoid potential issues."
                 )
 
             self._parse_model_config(model_config)
@@ -1211,7 +1209,7 @@ This pull request has been automatically generated to add {self.__class__.__name
         cache_folder: str | None,
         revision: str | None = None,
         local_files_only: bool = False,
-    ) -> str | None:
+    ) -> str:
         """
         Retrieves the model_type from the config_sentence_transformers.json file.
 
@@ -1369,7 +1367,7 @@ This pull request has been automatically generated to add {self.__class__.__name
                 logger.info("CUDA/NPU is not available. Starting 4 CPU workers")
                 target_devices = ["cpu"] * 4
 
-        logger.info("Start multi-process pool on devices: {}".format(", ".join(map(str, target_devices))))
+        logger.info(f"Starting multi-process pool on devices: {', '.join(map(str, target_devices))}")
 
         self.to("cpu")
         self.share_memory()

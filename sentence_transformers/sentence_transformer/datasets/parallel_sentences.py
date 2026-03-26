@@ -87,7 +87,7 @@ class ParallelSentencesDataset(Dataset):
             None
         """
 
-        logger.info("Load " + filepath)
+        logger.info(f"Loading {filepath}")
         parallel_sentences = []
 
         with (

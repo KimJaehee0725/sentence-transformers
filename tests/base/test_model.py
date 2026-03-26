@@ -319,41 +319,70 @@ def test_save_with_safe_serialization_fallback(
     assert "fallback" in call_log
 
 
-def test_save_load_roundtrip(stsb_bert_tiny_model: SentenceTransformer, tmp_path: Path) -> None:
+def test_save_load_roundtrip(stsb_bert_tiny_model: SentenceTransformer, tmp_path: Path, caplog) -> None:
     """A model saved and re-loaded should produce the same embeddings."""
     sentences = ["Hello world", "Testing roundtrip"]
     original_embeddings = stsb_bert_tiny_model.encode(sentences)
 
     stsb_bert_tiny_model.save(str(tmp_path))
-    loaded_model = SentenceTransformer(str(tmp_path))
+    with caplog.at_level(logging.INFO, logger="sentence_transformers.base.model"):
+        loaded_model = SentenceTransformer(str(tmp_path))
     loaded_embeddings = loaded_model.encode(sentences)
 
     np.testing.assert_allclose(original_embeddings, loaded_embeddings, atol=1e-5)
+    assert f"Loading SentenceTransformer model from {tmp_path}" in caplog.text
 
 
-def test_save_load_roundtrip_sparse_encoder(splade_bert_tiny_model: SparseEncoder, tmp_path: Path) -> None:
+def test_save_load_roundtrip_sparse_encoder(splade_bert_tiny_model: SparseEncoder, tmp_path: Path, caplog) -> None:
     """A SparseEncoder model saved and re-loaded should produce the same embeddings."""
     sentences = ["Hello world", "Testing roundtrip"]
     encode_kwargs = {"convert_to_sparse_tensor": False, "save_to_cpu": True}
     original_embeddings = splade_bert_tiny_model.encode(sentences, **encode_kwargs)
 
     splade_bert_tiny_model.save(str(tmp_path))
-    loaded_model = SparseEncoder(str(tmp_path))
+    with caplog.at_level(logging.INFO, logger="sentence_transformers.base.model"):
+        loaded_model = SparseEncoder(str(tmp_path))
     loaded_embeddings = loaded_model.encode(sentences, **encode_kwargs)
 
     np.testing.assert_allclose(original_embeddings, loaded_embeddings, atol=1e-5)
+    assert f"Loading SparseEncoder model from {tmp_path}" in caplog.text
 
 
-def test_save_load_roundtrip_cross_encoder(reranker_bert_tiny_model: CrossEncoder, tmp_path: Path) -> None:
+def test_save_load_roundtrip_cross_encoder(reranker_bert_tiny_model: CrossEncoder, tmp_path: Path, caplog) -> None:
     """A CrossEncoder model saved and re-loaded should produce the same predictions."""
     pairs = [("Hello", "World"), ("Testing", "Roundtrip")]
     original_preds = reranker_bert_tiny_model.predict(pairs)
 
     reranker_bert_tiny_model.save(str(tmp_path))
-    loaded_model = CrossEncoder(str(tmp_path))
+    with caplog.at_level(logging.INFO, logger="sentence_transformers.base.model"):
+        loaded_model = CrossEncoder(str(tmp_path))
     loaded_preds = loaded_model.predict(pairs)
 
     np.testing.assert_allclose(original_preds, loaded_preds, atol=1e-5)
+    assert f"Loading CrossEncoder model from {tmp_path}" in caplog.text
+
+
+def test_load_logs_no_modules_json(stsb_bert_tiny_model: SentenceTransformer, tmp_path: Path, caplog) -> None:
+    """Loading a plain HF model (no modules.json) should log the initializing message."""
+    stsb_bert_tiny_model.save(str(tmp_path))
+    (tmp_path / "modules.json").unlink()
+
+    with caplog.at_level(logging.INFO, logger="sentence_transformers.base.model"):
+        SentenceTransformer(str(tmp_path))
+
+    assert f"No modules.json found for {tmp_path}" in caplog.text
+    assert "initializing a new SentenceTransformer model" in caplog.text
+
+
+def test_load_logs_converting_model_type(stsb_bert_tiny_model: SentenceTransformer, tmp_path: Path, caplog) -> None:
+    """Loading a SentenceTransformer model as a SparseEncoder should log the converting message."""
+    stsb_bert_tiny_model.save(str(tmp_path))
+
+    with caplog.at_level(logging.INFO, logger="sentence_transformers.base.model"):
+        SparseEncoder(str(tmp_path))
+
+    assert "Converting SentenceTransformer" in caplog.text
+    assert "to SparseEncoder" in caplog.text
 
 
 class _FakeEvaluator(BaseEvaluator):
