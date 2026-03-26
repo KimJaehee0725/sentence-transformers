@@ -8,6 +8,7 @@ from dataclasses import fields
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, get_args, get_type_hints
 
 import torch
+from packaging.version import parse as parse_version
 from tokenizers.normalizers import Lowercase, Sequence
 from transformers import (
     AutoConfig,
@@ -39,6 +40,7 @@ from transformers import (
     UMT5Config,
     WhisperConfig,
 )
+from transformers import __version__ as transformers_version
 from transformers.utils import ModelOutput
 from transformers.utils import logging as transformers_logging
 from transformers.utils.import_utils import is_peft_available
@@ -89,11 +91,18 @@ except ImportError:
         pass
 
 
-logger = transformers_logging.get_logger(__name__)
-
-
 if TYPE_CHECKING and is_peft_available():
     from peft import PeftConfig
+
+logger = transformers_logging.get_logger(__name__)
+
+# processor_kwargs was added to apply_chat_template on the transformers main branch (currently 5.3.0.dev0) and will
+# ship in 5.3.1+/5.4.0+. The released 5.3.0 does NOT have it, so we exclude that exact version.
+_parsed_transformers_version = parse_version(transformers_version)
+_TRANSFORMERS_SUPPORTS_PROCESSOR_KWARGS = _parsed_transformers_version >= parse_version(
+    "5.3.0.dev0"
+) and _parsed_transformers_version != parse_version("5.3.0")
+
 
 TransformerTask = Literal[
     "feature-extraction", "sequence-classification", "text-generation", "any-to-any", "fill-mask"
@@ -1127,17 +1136,36 @@ class Transformer(InputModule):
         # the text kwargs to be passed at the top level instead of in a nested "text_kwargs" dict.
         chat_template_kwargs = self.processing_kwargs.get("chat_template", {})
         if isinstance(self.processor, ProcessorMixin):
-            return self.processor.apply_chat_template(
-                messages,
-                tokenize=True,
-                return_dict=True,
-                text_kwargs=modality_kwargs["text"],
-                images_kwargs=modality_kwargs["image"],
-                audio_kwargs=modality_kwargs["audio"],
-                videos_kwargs=modality_kwargs["video"],
-                common_kwargs=common_kwargs,
-                **chat_template_kwargs,
-            )
+            # Transformers v5.4.0 prefers us to pass processor_kwargs as a single dict, but there's still some top level
+            # kwargs that need to be hoisted out for backwards compatibility.
+            if _TRANSFORMERS_SUPPORTS_PROCESSOR_KWARGS:
+                return self.processor.apply_chat_template(
+                    messages,
+                    tokenize=True,
+                    return_dict=True,
+                    return_tensors=common_kwargs.get("return_tensors", "pt"),
+                    load_audio_from_video=modality_kwargs["video"].get("load_audio_from_video", False),
+                    processor_kwargs={
+                        "text_kwargs": modality_kwargs["text"],
+                        "images_kwargs": modality_kwargs["image"],
+                        "audio_kwargs": modality_kwargs["audio"],
+                        "videos_kwargs": modality_kwargs["video"],
+                        "common_kwargs": common_kwargs,
+                    },
+                    **chat_template_kwargs,
+                )
+            else:
+                return self.processor.apply_chat_template(
+                    messages,
+                    tokenize=True,
+                    return_dict=True,
+                    text_kwargs=modality_kwargs["text"],
+                    images_kwargs=modality_kwargs["image"],
+                    audio_kwargs=modality_kwargs["audio"],
+                    videos_kwargs=modality_kwargs["video"],
+                    common_kwargs=common_kwargs,
+                    **chat_template_kwargs,
+                )
 
         # apply_chat_template expects padding/truncation/max_length/return_tensors as top-level kwargs,
         # not nested inside tokenizer_kwargs or common_kwargs, so we hoist them out.
