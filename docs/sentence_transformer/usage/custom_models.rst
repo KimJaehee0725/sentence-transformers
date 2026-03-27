@@ -16,7 +16,7 @@ For example, the popular `all-MiniLM-L6-v2 <https://huggingface.co/sentence-tran
 .. code-block:: python
 
    from sentence_transformers import SentenceTransformer
-   from sentence_transformers.modules import Transformer, Pooling, Normalize
+   from sentence_transformers.sentence_transformer.modules import Transformer, Pooling, Normalize
 
    transformer = Transformer("sentence-transformers/all-MiniLM-L6-v2", max_seq_length=256)
    pooling = Pooling(transformer.get_embedding_dimension(), pooling_mode="mean")
@@ -121,7 +121,7 @@ To be specific, these two snippets are identical::
 ::
 
    from sentence_transformers import SentenceTransformer
-   from sentence_transformers.modules import Transformer, Pooling
+   from sentence_transformers.sentence_transformer.modules import Transformer, Pooling
 
    transformer = Transformer("bert-base-uncased")
    pooling = Pooling(transformer.get_embedding_dimension(), pooling_mode="mean")
@@ -172,7 +172,7 @@ For example, we can create a custom pooling method by implementing a custom Modu
    # decay_pooling.py
 
    import torch
-   from sentence_transformers.modules import Module
+   from sentence_transformers.sentence_transformer.modules import Module
 
 
    class DecayMeanPooling(Module):
@@ -217,7 +217,7 @@ For example, we can create a custom pooling method by implementing a custom Modu
 This can now be used as a module in a Sentence Transformer model::
    
    from sentence_transformers import SentenceTransformer
-   from sentence_transformers.modules import Transformer, Pooling, Normalize
+   from sentence_transformers.sentence_transformer.modules import Transformer, Pooling, Normalize
    from decay_pooling import DecayMeanPooling
 
    transformer = Transformer("bert-base-uncased", max_seq_length=256)
@@ -326,7 +326,7 @@ If you want your users to be able to specify custom keyword arguments via the :m
 
 Then, you can access the ``task`` keyword argument in the ``forward`` method of your custom module::
 
-   from sentence_transformers.modules import Transformer
+   from sentence_transformers.sentence_transformer.modules import Transformer
 
    class CustomTransformer(Transformer):
        def forward(self, features: dict[str, torch.Tensor], task: Optional[str] = None, **kwargs) -> dict[str, torch.Tensor]:

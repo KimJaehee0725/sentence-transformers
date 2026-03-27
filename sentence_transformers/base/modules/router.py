@@ -67,7 +67,7 @@ class Router(InputModule):
             ::
 
                 from sentence_transformers import SentenceTransformer
-                from sentence_transformers.modules import Router, Normalize
+                from sentence_transformers.sentence_transformer.modules import Router, Normalize
 
                 # Use a regular SentenceTransformer for the document embeddings, and a static embedding model for the query embeddings
                 document_embedder = SentenceTransformer("mixedbread-ai/mxbai-embed-large-v1")
@@ -91,7 +91,7 @@ class Router(InputModule):
 
             ::
 
-                from sentence_transformers.modules import Router, SparseStaticEmbedding, SpladePooling, Transformer
+                from sentence_transformers.sparse_encoder.modules import Router, SparseStaticEmbedding, SpladePooling, Transformer
                 from sentence_transformers.sparse_encoder import SparseEncoder
 
                 # Load an asymmetric model with different encoders for queries and documents
@@ -151,7 +151,7 @@ class Router(InputModule):
 
                 from PIL import Image
                 from sentence_transformers import SentenceTransformer
-                from sentence_transformers.modules import Dense, Pooling, Router, Transformer
+                from sentence_transformers.sentence_transformer.modules import Dense, Pooling, Router, Transformer
 
                 # Create separate encoders for different modalities
                 text_encoder = Transformer("sentence-transformers/all-MiniLM-L6-v2")
@@ -191,7 +191,7 @@ class Router(InputModule):
             ::
 
                 from sentence_transformers import SentenceTransformer
-                from sentence_transformers.modules import Router
+                from sentence_transformers.sentence_transformer.modules import Router
 
                 # Different encoders for query text, document text, and images
                 router = Router(

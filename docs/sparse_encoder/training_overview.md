@@ -73,7 +73,7 @@ But if instead you want to train from another checkpoint, or from scratch, then 
     ::
 
         from sentence_transformers import SparseEncoder
-        from sentence_transformers.modules import Transformer, SpladePooling
+        from sentence_transformers.sparse_encoder.modules import Transformer, SpladePooling
 
         # Initialize Transformer (use a fill-mask model)
         mlm_transformer = Transformer("google-bert/bert-base-uncased", transformer_task="fill-mask")
@@ -115,7 +115,7 @@ But if instead you want to train from another checkpoint, or from scratch, then 
     ::
 
         from sentence_transformers import SparseEncoder
-        from sentence_transformers.modules import Router, Transformer, SparseStaticEmbedding, SpladePooling
+        from sentence_transformers.sparse_encoder.modules import Router, SparseStaticEmbedding, SpladePooling, Transformer
 
         # Initialize MLM Transformer for document encoding
         doc_encoder = Transformer("google-bert/bert-base-uncased", transformer_task="fill-mask")
@@ -196,7 +196,8 @@ But if instead you want to train from another checkpoint, or from scratch, then 
     ::
 
         from sentence_transformers import SparseEncoder
-        from sentence_transformers.modules import Transformer, Pooling, SparseAutoEncoder
+        from sentence_transformers.sparse_encoder.modules import SparseAutoEncoder, Transformer
+        from sentence_transformers.sentence_transformer.modules import Pooling
 
         # Initialize transformer (can be any dense encoder model)
         transformer = Transformer("google-bert/bert-base-uncased")
@@ -763,7 +764,7 @@ The :class:`~sentence_transformers.sparse_encoder.trainer.SparseEncoderTrainer` 
             SparseEncoderTrainer,
             SparseEncoderTrainingArguments,
         )
-        from sentence_transformers.modules import Router, Transformer, SparseStaticEmbedding, SpladePooling
+        from sentence_transformers.sparse_encoder.modules import Router, SparseStaticEmbedding, SpladePooling, Transformer
         from sentence_transformers.sparse_encoder.evaluation import SparseNanoBEIREvaluator
         from sentence_transformers.sparse_encoder.losses import SparseMultipleNegativesRankingLoss, SpladeLoss
         from sentence_transformers.sentence_transformer.training_args import BatchSamplers

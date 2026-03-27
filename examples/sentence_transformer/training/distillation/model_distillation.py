@@ -30,9 +30,9 @@ from datasets import Dataset, concatenate_datasets, load_dataset
 from sklearn.decomposition import PCA
 
 from sentence_transformers import LoggingHandler, SentenceTransformer, evaluation
-from sentence_transformers.modules import Dense
 from sentence_transformers.sentence_transformer.evaluation import EmbeddingSimilarityEvaluator
 from sentence_transformers.sentence_transformer.losses import MSELoss
+from sentence_transformers.sentence_transformer.modules import Dense
 from sentence_transformers.sentence_transformer.trainer import SentenceTransformerTrainer
 from sentence_transformers.sentence_transformer.training_args import SentenceTransformerTrainingArguments
 from sentence_transformers.util.similarity import SimilarityFunction

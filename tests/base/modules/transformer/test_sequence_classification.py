@@ -17,7 +17,7 @@ from transformers.models.auto.modeling_auto import (
     MODEL_MAPPING_NAMES,
 )
 
-from sentence_transformers.modules import Transformer
+from sentence_transformers.base.modules import Transformer
 from sentence_transformers.util.tensor import batch_to_device
 
 from .conftest import (

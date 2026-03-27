@@ -13,9 +13,10 @@ from torch import nn
 
 from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer, SentenceTransformerTrainingArguments
 from sentence_transformers.base.modality_types import Modality
+from sentence_transformers.base.modules import Dense, Router
 from sentence_transformers.base.modules.input_module import InputModule
-from sentence_transformers.modules import Dense, Normalize, Router, StaticEmbedding
 from sentence_transformers.sentence_transformer.losses import MultipleNegativesRankingLoss
+from sentence_transformers.sentence_transformer.modules import Normalize, StaticEmbedding
 from sentence_transformers.util import is_datasets_available
 
 from sentence_transformers.models import Asym  # isort:skip  Softly deprecated import

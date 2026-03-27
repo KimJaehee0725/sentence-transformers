@@ -24,13 +24,13 @@ from datasets import load_dataset
 
 from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer, SentenceTransformerTrainingArguments
 from sentence_transformers.base.sampler import BatchSamplers
-from sentence_transformers.modules import Dense
 from sentence_transformers.sentence_transformer.evaluation import (
     EmbeddingSimilarityEvaluator,
     SequentialEvaluator,
     SimilarityFunction,
 )
 from sentence_transformers.sentence_transformer.losses import MatryoshkaLoss, MultipleNegativesRankingLoss
+from sentence_transformers.sentence_transformer.modules import Dense
 
 # Set the log level to INFO to get more information
 logging.basicConfig(format="%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)

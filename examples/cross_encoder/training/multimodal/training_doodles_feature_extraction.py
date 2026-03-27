@@ -33,7 +33,7 @@ from sentence_transformers.cross_encoder.evaluation import CrossEncoderReranking
 from sentence_transformers.cross_encoder.losses import BinaryCrossEntropyLoss
 from sentence_transformers.cross_encoder.trainer import CrossEncoderTrainer
 from sentence_transformers.cross_encoder.training_args import CrossEncoderTrainingArguments
-from sentence_transformers.modules import Dense, Pooling, Transformer
+from sentence_transformers.sentence_transformer.modules import Dense, Pooling, Transformer
 
 logging.basicConfig(format="%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 

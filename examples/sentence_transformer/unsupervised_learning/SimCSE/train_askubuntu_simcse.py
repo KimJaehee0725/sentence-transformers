@@ -9,9 +9,9 @@ from sentence_transformers import (
     SentenceTransformerTrainer,
     SentenceTransformerTrainingArguments,
 )
-from sentence_transformers.modules import Pooling, Transformer
 from sentence_transformers.sentence_transformer.evaluation import RerankingEvaluator
 from sentence_transformers.sentence_transformer.losses import MultipleNegativesRankingLoss
+from sentence_transformers.sentence_transformer.modules import Pooling, Transformer
 
 # Just some code to print debug information to stdout
 logging.basicConfig(

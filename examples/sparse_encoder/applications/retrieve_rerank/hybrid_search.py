@@ -6,12 +6,12 @@ from datasets import load_dataset
 
 from sentence_transformers import CrossEncoder, SentenceTransformer, SparseEncoder
 from sentence_transformers.cross_encoder.evaluation import CrossEncoderRerankingEvaluator
-from sentence_transformers.modules import SpladePooling, Transformer
 from sentence_transformers.sentence_transformer.evaluation import InformationRetrievalEvaluator
 from sentence_transformers.sparse_encoder.evaluation import (
     ReciprocalRankFusionEvaluator,
     SparseInformationRetrievalEvaluator,
 )
+from sentence_transformers.sparse_encoder.modules import SpladePooling, Transformer
 
 # Configure logging
 logging.basicConfig(format="%(message)s", level=logging.INFO)

@@ -6,9 +6,9 @@ from datetime import datetime
 from datasets import load_dataset
 
 from sentence_transformers import SentenceTransformer
-from sentence_transformers.modules import Pooling, Transformer
 from sentence_transformers.sentence_transformer.evaluation import RerankingEvaluator
 from sentence_transformers.sentence_transformer.losses import DenoisingAutoEncoderLoss
+from sentence_transformers.sentence_transformer.modules import Pooling, Transformer
 from sentence_transformers.sentence_transformer.trainer import SentenceTransformerTrainer
 from sentence_transformers.sentence_transformer.training_args import SentenceTransformerTrainingArguments
 

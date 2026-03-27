@@ -56,7 +56,7 @@ class StaticEmbedding(InputModule):
         Example::
 
             from sentence_transformers import SentenceTransformer
-            from sentence_transformers.modules import StaticEmbedding
+            from sentence_transformers.sentence_transformer.modules import StaticEmbedding
             from tokenizers import Tokenizer
 
             # Pre-distilled embeddings:

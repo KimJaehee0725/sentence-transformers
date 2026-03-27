@@ -31,8 +31,8 @@ import tqdm
 from torch.utils.data import DataLoader, Dataset
 
 from sentence_transformers import InputExample, LoggingHandler, SentenceTransformer
-from sentence_transformers.modules import Pooling, Transformer
 from sentence_transformers.sentence_transformer.losses import MultipleNegativesRankingLoss
+from sentence_transformers.sentence_transformer.modules import Pooling, Transformer
 from sentence_transformers.util import http_get
 
 #### Just some code to print debug information to stdout

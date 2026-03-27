@@ -76,7 +76,7 @@ But if instead you want to train from another checkpoint, or from scratch, then 
     ::
 
         from sentence_transformers import SentenceTransformer
-        from sentence_transformers.modules import Transformer, Pooling
+        from sentence_transformers.sentence_transformer.modules import Transformer, Pooling
 
         transformer = Transformer("google-bert/bert-base-uncased")
         pooling = Pooling(transformer.get_embedding_dimension(), pooling_mode="mean")
@@ -120,7 +120,7 @@ But if instead you want to train from another checkpoint, or from scratch, then 
     ::
 
         from sentence_transformers import SentenceTransformer
-        from sentence_transformers.modules import StaticEmbedding
+        from sentence_transformers.sentence_transformer.modules import StaticEmbedding
         from tokenizers import Tokenizer
 
         # Load any Tokenizer from Hugging Face

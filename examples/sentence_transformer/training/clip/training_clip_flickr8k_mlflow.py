@@ -3,9 +3,9 @@ from datetime import datetime
 
 from datasets import DatasetDict, load_dataset
 
-from sentence_transformers.modules import CLIPModel
 from sentence_transformers.sentence_transformer import SentenceTransformer, losses
 from sentence_transformers.sentence_transformer.evaluation import BinaryClassificationEvaluator
+from sentence_transformers.sentence_transformer.modules import CLIPModel
 from sentence_transformers.sentence_transformer.trainer import SentenceTransformerTrainer
 from sentence_transformers.sentence_transformer.training_args import SentenceTransformerTrainingArguments
 

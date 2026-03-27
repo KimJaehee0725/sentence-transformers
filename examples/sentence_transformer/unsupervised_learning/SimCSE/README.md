@@ -12,7 +12,7 @@ SentenceTransformers implements the [MultipleNegativesRankingLoss](https://www.s
 
 ```python
 from sentence_transformers import SentenceTransformer, InputExample
-from sentence_transformers.modules import Transformer, Pooling
+from sentence_transformers.sentence_transformer.modules import Transformer, Pooling
 from sentence_transformers.sentence_transformer.losses import MultipleNegativesRankingLoss
 from torch.utils.data import DataLoader
 

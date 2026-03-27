@@ -20,7 +20,7 @@ from bitext_mining_utils import kNN, score_candidates
 from sklearn.decomposition import PCA
 
 from sentence_transformers import SentenceTransformer
-from sentence_transformers.modules import Dense
+from sentence_transformers.sentence_transformer.modules import Dense
 
 # Model we want to use for bitext mining. LaBSE achieves state-of-the-art performance
 model_name = "LaBSE"

@@ -10,7 +10,7 @@ from packaging.version import parse as parse_version
 from transformers import __version__ as transformers_version
 
 from sentence_transformers import SentenceTransformer
-from sentence_transformers.modules import Pooling
+from sentence_transformers.sentence_transformer.modules import Pooling
 from sentence_transformers.sentence_transformer.modules.pooling import _convert_legacy_pooling_kwargs
 
 requires_transformers_v5 = pytest.mark.skipif(

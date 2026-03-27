@@ -15,7 +15,7 @@ import pytest
 import torch
 from PIL import Image
 
-from sentence_transformers.modules import Transformer
+from sentence_transformers.base.modules import Transformer
 from tests.utils import is_ci
 
 try:

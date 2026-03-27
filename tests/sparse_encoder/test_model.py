@@ -11,8 +11,9 @@ import numpy as np
 import pytest
 import torch
 
-from sentence_transformers.modules import Pooling, Router, SparseAutoEncoder, SpladePooling, Transformer
+from sentence_transformers.sentence_transformer.modules import Pooling
 from sentence_transformers.sparse_encoder.model import SparseEncoder
+from sentence_transformers.sparse_encoder.modules import Router, SparseAutoEncoder, SpladePooling, Transformer
 from sentence_transformers.util.similarity import SimilarityFunction
 
 

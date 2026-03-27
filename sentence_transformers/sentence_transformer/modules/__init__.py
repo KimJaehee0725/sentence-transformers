@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# Base modules are re-exported here so all modules used to build a SentenceTransformer
+# can be imported from this single path.
 from ...base.modules.dense import Dense
 from ...base.modules.input_module import InputModule
 from ...base.modules.module import Module

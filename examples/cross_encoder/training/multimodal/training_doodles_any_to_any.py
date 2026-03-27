@@ -28,9 +28,9 @@ from datasets import load_dataset
 from sentence_transformers.cross_encoder import CrossEncoder
 from sentence_transformers.cross_encoder.evaluation import CrossEncoderRerankingEvaluator
 from sentence_transformers.cross_encoder.losses import BinaryCrossEntropyLoss
+from sentence_transformers.cross_encoder.modules import LogitScore, Transformer
 from sentence_transformers.cross_encoder.trainer import CrossEncoderTrainer
 from sentence_transformers.cross_encoder.training_args import CrossEncoderTrainingArguments
-from sentence_transformers.modules import LogitScore, Transformer
 
 logging.basicConfig(format="%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 

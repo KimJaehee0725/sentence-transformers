@@ -32,9 +32,9 @@ from torch.utils.data import DataLoader
 from sentence_transformers import LoggingHandler, SentenceTransformer
 from sentence_transformers.cross_encoder import CrossEncoder
 from sentence_transformers.cross_encoder.evaluation import CrossEncoderCorrelationEvaluator
-from sentence_transformers.modules import Pooling, Transformer
 from sentence_transformers.sentence_transformer.evaluation import EmbeddingSimilarityEvaluator
 from sentence_transformers.sentence_transformer.losses import CosineSimilarityLoss
+from sentence_transformers.sentence_transformer.modules import Pooling, Transformer
 from sentence_transformers.sentence_transformer.readers import InputExample
 from sentence_transformers.util import cos_sim
 

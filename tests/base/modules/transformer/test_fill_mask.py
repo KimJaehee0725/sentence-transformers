@@ -14,7 +14,7 @@ from packaging.version import Version
 from transformers import __version__ as transformers_version
 from transformers.models.auto.modeling_auto import MODEL_FOR_MASKED_LM_MAPPING_NAMES, MODEL_MAPPING_NAMES
 
-from sentence_transformers.modules import Transformer
+from sentence_transformers.base.modules import Transformer
 from sentence_transformers.util.tensor import batch_to_device
 
 from .conftest import (

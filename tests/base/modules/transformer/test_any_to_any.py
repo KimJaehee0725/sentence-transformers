@@ -14,7 +14,7 @@ import torch
 from packaging.version import Version
 from transformers import __version__ as transformers_version
 
-from sentence_transformers.modules import Transformer
+from sentence_transformers.base.modules import Transformer
 from sentence_transformers.util.tensor import batch_to_device
 
 from .conftest import (
