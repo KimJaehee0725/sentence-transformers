@@ -1,7 +1,7 @@
 """
 Test suite for Transformer module with any-to-any task.
 Tests various tiny model architectures that support multimodal language modeling,
-which is used by CrossEncoder with CausalScoreHead for models that can also
+which is used by CrossEncoder with LogitScore for models that can also
 input non-text modalities (e.g. images, audio, video).
 """
 

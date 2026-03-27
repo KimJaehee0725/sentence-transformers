@@ -1,7 +1,7 @@
 """
 Test suite for Transformer module with text-generation task.
 Tests various tiny model architectures that support causal language modeling,
-which is used by CrossEncoder with CausalScoreHead.
+which is used by CrossEncoder with LogitScore.
 """
 
 from __future__ import annotations

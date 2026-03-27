@@ -1,9 +1,9 @@
 """
 This example trains a multimodal CrossEncoder reranker on the doodles-captions-manual dataset
-using feature extraction with Pooling + Dense instead of CausalScoreHead. This avoids the
+using feature extraction with Pooling + Dense instead of LogitScore. This avoids the
 expensive LM head computation over the full vocabulary by extracting the last token's hidden
 state and projecting it to a single score via a Dense layer. The Dense layer is initialized
-from the model's embedding weights for the "1" and "0" tokens to approximate CausalScoreHead
+from the model's embedding weights for the "1" and "0" tokens to approximate LogitScore
 behavior at initialization.
 
 The model learns to match images with their correct text captions (and vice versa) using
@@ -13,7 +13,7 @@ BinaryCrossEntropyLoss with multi-dataset training. Two sub-datasets are created
 
 Each sample is expanded with negatives at a 1:4 positive-to-negative ratio.
 
-See also ``training_doodles_any_to_any.py`` for an alternative approach that uses CausalScoreHead.
+See also ``training_doodles_any_to_any.py`` for an alternative approach that uses LogitScore.
 That variant loads the full causal LM, generates a single token, and compares logits for "1" vs
 "0" to produce a score. Both approaches produce comparable results, but this variant is more
 memory-efficient since it doesn't require the LM head.
@@ -72,7 +72,7 @@ transformer.processor.chat_template = transformer.processor.chat_template.replac
 pooling = Pooling(transformer.get_embedding_dimension(), pooling_mode="lasttoken")
 
 # Dense layer: projects the hidden state (hidden_dim) to a single score.
-# Initialized with weight = embed("1") - embed("0"), which approximates the CausalScoreHead
+# Initialized with weight = embed("1") - embed("0"), which approximates the LogitScore
 # log-odds computation at initialization. In most models, input embeddings are tied with the
 # LM head weights, so this gives a similar starting point.
 true_token_id = transformer.tokenizer.convert_tokens_to_ids("1")

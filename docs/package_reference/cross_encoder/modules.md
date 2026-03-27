@@ -4,8 +4,8 @@
 
 See also the modules from `sentence_transformers.base.modules` in [Base > Modules](../base/modules.rst).
 
-## CausalScoreHead
+## LogitScore
 
 ```{eval-rst}
-.. autoclass:: sentence_transformers.cross_encoder.modules.CausalScoreHead
+.. autoclass:: sentence_transformers.cross_encoder.modules.LogitScore
 ```

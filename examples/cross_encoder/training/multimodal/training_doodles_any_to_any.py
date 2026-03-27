@@ -1,6 +1,6 @@
 """
 This example trains a multimodal CrossEncoder reranker on the doodles-captions-manual dataset
-using a causal LM with CausalScoreHead. CausalScoreHead works by generating a single token
+using a causal LM with LogitScore. LogitScore works by generating a single token
 and comparing the logits for "1" (match) vs "0" (no match) to produce a score.
 
 The model learns to match images with their correct text captions (and vice versa) using
@@ -11,7 +11,7 @@ BinaryCrossEntropyLoss with multi-dataset training. Two sub-datasets are created
 Each sample is expanded with negatives at a 1:4 positive-to-negative ratio.
 
 See also ``training_doodles_feature_extraction.py`` for an alternative approach that uses
-Pooling + Dense instead of CausalScoreHead. That variant extracts the last token's hidden state
+Pooling + Dense instead of LogitScore. That variant extracts the last token's hidden state
 and projects it to a score via a Dense layer, avoiding the expensive LM head computation over
 the full vocabulary. Both approaches produce comparable results.
 
@@ -30,7 +30,7 @@ from sentence_transformers.cross_encoder.evaluation import CrossEncoderReranking
 from sentence_transformers.cross_encoder.losses import BinaryCrossEntropyLoss
 from sentence_transformers.cross_encoder.trainer import CrossEncoderTrainer
 from sentence_transformers.cross_encoder.training_args import CrossEncoderTrainingArguments
-from sentence_transformers.modules import CausalScoreHead, Transformer
+from sentence_transformers.modules import LogitScore, Transformer
 
 logging.basicConfig(format="%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
@@ -63,9 +63,9 @@ transformer.processor.chat_template = transformer.processor.chat_template.replac
     'message.role == "user"', 'message.role in ["user", "query", "document"]'
 )
 
-# CausalScoreHead: generates one token and computes score = log(P("1")) - log(P("0")),
+# LogitScore: generates one token and computes score = log(P("1")) - log(P("0")),
 # i.e. the log-odds that the query-document pair is a match.
-score_head = CausalScoreHead(
+score_head = LogitScore(
     true_token_id=transformer.tokenizer.convert_tokens_to_ids("1"),
     false_token_id=transformer.tokenizer.convert_tokens_to_ids("0"),
 )

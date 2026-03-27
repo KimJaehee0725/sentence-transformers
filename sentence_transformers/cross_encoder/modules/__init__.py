@@ -1,5 +1,5 @@
 from __future__ import annotations
 
-from .causal_score_head import CausalScoreHead
+from .logit_score import LogitScore
 
-__all__ = ["CausalScoreHead"]
+__all__ = ["LogitScore"]

@@ -6,7 +6,7 @@ for convenient importing.
 from __future__ import annotations
 
 from .base.modules import InputModule, Module, Router, Transformer
-from .cross_encoder.modules import CausalScoreHead
+from .cross_encoder.modules import LogitScore
 from .sentence_transformer.modules import (
     CNN,
     LSTM,
@@ -45,7 +45,7 @@ __all__ = [
     "WordEmbeddings",
     "WordWeights",
     # CrossEncoder modules
-    "CausalScoreHead",
+    "LogitScore",
     # SparseEncoder modules
     "MLMTransformer",
     "SparseAutoEncoder",

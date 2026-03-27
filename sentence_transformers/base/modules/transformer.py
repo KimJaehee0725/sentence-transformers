@@ -626,7 +626,7 @@ class Transformer(InputModule):
                         self.tokenizer.basic_tokenizer.do_lower_case = do_lower_case
 
         # Causal models require left padding so the last position is always a real token,
-        # which is needed for logits_to_keep=1 and CausalScoreHead.
+        # which is needed for logits_to_keep=1 and LogitScore.
         if self.transformer_task in ("text-generation", "any-to-any"):
             self.processor.padding_side = "left"
             if hasattr(self.processor, "tokenizer"):
@@ -900,7 +900,7 @@ class Transformer(InputModule):
                 raise ValueError(
                     f"The processor padding side is {self.processor.padding_side!r}, but causal models require "
                     "left padding so that the last token position is always a real token. "
-                    "This is needed for efficient logit computation (logits_to_keep=1) and for CausalScoreHead. "
+                    "This is needed for efficient logit computation (logits_to_keep=1) and for LogitScore. "
                     'Please set ``processing_kwargs={"padding_side": "left"}``.'
                 )
             processor_output["logits_to_keep"] = 1

@@ -21,7 +21,7 @@ from sentence_transformers.base.model import BaseModel
 from sentence_transformers.base.modules import Transformer
 from sentence_transformers.cross_encoder.fit_mixin import FitMixin
 from sentence_transformers.cross_encoder.model_card import CrossEncoderModelCardData
-from sentence_transformers.cross_encoder.modules.causal_score_head import CausalScoreHead
+from sentence_transformers.cross_encoder.modules.logit_score import LogitScore
 from sentence_transformers.util import batch_to_device, fullname, import_from_string
 from sentence_transformers.util.decorators import (
     cross_encoder_init_args_decorator,
@@ -246,7 +246,7 @@ class CrossEncoder(BaseModel, FitMixin):
                 config_kwargs=config_kwargs,
                 backend=self.backend,
             )
-            post_processing = CausalScoreHead(
+            post_processing = LogitScore(
                 true_token_id=transformer_model.tokenizer.convert_tokens_to_ids("yes"),
                 false_token_id=transformer_model.tokenizer.convert_tokens_to_ids("no"),
             )
@@ -421,8 +421,8 @@ class CrossEncoder(BaseModel, FitMixin):
         for module in reversed(self):
             if isinstance(module, Transformer):
                 return module.model.config.num_labels
-            if isinstance(module, CausalScoreHead):
-                return module.num_labels
+            if isinstance(module, LogitScore):
+                return 1
         # Default to 1, not commonly reached
         return 1
 
