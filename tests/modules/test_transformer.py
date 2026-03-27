@@ -23,6 +23,8 @@ transformer_module = sys.modules[Transformer.__module__]
 
 TINY_BERT = "sentence-transformers-testing/stsb-bert-tiny-safetensors"
 
+# TODO: Move all test files to its matching location in the main source, e.g. this to tests/base/modules/test_transformer.py
+
 
 @pytest.fixture()
 def bert_tiny_transformer(stsb_bert_tiny_model) -> Transformer:

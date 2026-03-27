@@ -96,12 +96,7 @@ if TYPE_CHECKING and is_peft_available():
 
 logger = transformers_logging.get_logger(__name__)
 
-# processor_kwargs was added to apply_chat_template on the transformers main branch (currently 5.3.0.dev0) and will
-# ship in 5.3.1+/5.4.0+. The released 5.3.0 does NOT have it, so we exclude that exact version.
-_parsed_transformers_version = parse_version(transformers_version)
-_TRANSFORMERS_SUPPORTS_PROCESSOR_KWARGS = _parsed_transformers_version >= parse_version(
-    "5.3.0.dev0"
-) and _parsed_transformers_version != parse_version("5.3.0")
+_TRANSFORMERS_SUPPORTS_PROCESSOR_KWARGS = parse_version(transformers_version) >= parse_version("5.4.0")
 
 
 TransformerTask = Literal[

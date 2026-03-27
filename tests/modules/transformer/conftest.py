@@ -137,15 +137,12 @@ EXPECT_FORWARD_FAIL = {
         # "audio (tensor)",
         "audio (dict)",
         "audio (path)",
+        "audio (audio_decoder)",
     ],
     "idefics": None,  # Checkpoint has "image_size": 224, which I can't override as image_size is normally a dict
     "idefics2": [  # Idefics2 doesn't accept image array/tensors
         "image (array)",
         "image (tensor)",
-    ],
-    "flava": [  # Flava is an outlier that doesn't process image paths or URLs, only PIL
-        "image (url)",
-        "image (path)",
     ],
     "paligemma": [  # Paligemma doesn't accept URL images if there's also a text
         "image+text (url, text)"

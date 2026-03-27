@@ -40,16 +40,6 @@ except ImportError:
 
 
 EXPECT_FORWARD_FAIL = EXPECT_FORWARD_FAIL.copy() | {
-    "llama4": (  # Cannot copy out of meta tensor; no data!, except text only which does work
-        "image (url)",
-        "image (array)",
-        "image (tensor)",
-        "image (pil)",
-        "image (path)",
-        "text+image (text, url)",
-        "image as message (structured, url)",
-        "text+image as message (structured, text, url)",
-    ),
     "qwen2_5_vl": (  # Doesn't nicely work with image+video, gives StopIteration on processing
         "image+video (url, url)",
         "text+image+video (text, url, url)",
@@ -58,11 +48,6 @@ EXPECT_FORWARD_FAIL = EXPECT_FORWARD_FAIL.copy() | {
 }
 
 EXPECT_FORWARD_FAIL_PAIRS = {
-    "llama4": (  # Cannot copy out of meta tensor; no data!, except text-text pairs which do work
-        "image+image pair (url, url)",
-        "text+image pair (text, url)",
-        "image+text pair (url, text)",
-    ),
     "kosmos-2": None,  # Preprocessor can't handle pairs
     "qwen2_5_vl": (  # Doesn't nicely work with image+video, gives StopIteration on processing
         "image+video pair (url, url)",
