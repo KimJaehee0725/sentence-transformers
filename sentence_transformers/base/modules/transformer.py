@@ -585,6 +585,7 @@ class Transformer(InputModule):
             "attention_mask",
             "token_type_ids",
             "inputs_embeds",
+            "return_dict",
         }
 
         if max_seq_length is not None and "model_max_length" not in processor_kwargs:
@@ -935,7 +936,6 @@ class Transformer(InputModule):
             method_output_name = tuple(method_output_name)
 
         # kwargs override features
-        # TODO: Perhaps return_dict=True is ignored due to the filtering
         all_kwargs = {**features, **kwargs, "return_dict": True}
         model_method = getattr(self.model, method_name, None)
         if model_method is None:
