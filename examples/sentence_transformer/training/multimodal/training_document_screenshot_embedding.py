@@ -44,8 +44,8 @@ logging.info(train_dataset)
 logging.info(eval_dataset)
 
 # 3. Define a loss function
-loss = CachedMultipleNegativesRankingLoss(model, mini_batch_size=1, show_progress_bar=True)
-loss = MatryoshkaLoss(model, loss, matryoshka_dims=[2048, 1024, 512, 256, 128, 64])
+loss = CachedMultipleNegativesRankingLoss(model, mini_batch_size=1)
+loss = MatryoshkaLoss(model, loss, matryoshka_dims=[2048, 1536, 1024, 512, 256, 128, 64])
 
 # 4. (Optional) Specify training arguments
 run_name = "Qwen3-VL-Embedding-2B-document-screenshots"
@@ -101,8 +101,20 @@ trainer = SentenceTransformerTrainer(
 )
 trainer.train()
 
-# 7. (Optional) Evaluate the trained model after training
+# 7. (Optional) Evaluate the trained model after training, e.g. on the Matryoshka dimensions separately
 eval_evaluator(model)
+for dim in [2048, 1536, 1024, 512, 256, 128, 64]:
+    eval_evaluator = InformationRetrievalEvaluator(
+        queries=eval_queries,
+        corpus=eval_corpus,
+        relevant_docs=eval_relevant_docs,
+        truncate_dim=dim,
+        batch_size=1,
+        show_progress_bar=True,
+        name=f"vdr-eval-hard-{dim}d",
+    )
+    eval_evaluator(model)
+
 
 # 8. Save the trained & evaluated model locally
 final_output_dir = f"models/{run_name}/final"

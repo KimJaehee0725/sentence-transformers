@@ -96,7 +96,7 @@ if TYPE_CHECKING and is_peft_available():
 
 logger = transformers_logging.get_logger(__name__)
 
-_TRANSFORMERS_SUPPORTS_PROCESSOR_KWARGS = parse_version(transformers_version) >= parse_version("5.4.0")
+_TRANSFORMERS_SUPPORTS_PROCESSOR_KWARGS = parse_version(transformers_version) >= parse_version("5.4.0.dev0")
 
 
 TransformerTask = Literal[
@@ -935,6 +935,7 @@ class Transformer(InputModule):
             method_output_name = tuple(method_output_name)
 
         # kwargs override features
+        # TODO: Perhaps return_dict=True is ignored due to the filtering
         all_kwargs = {**features, **kwargs, "return_dict": True}
         model_method = getattr(self.model, method_name, None)
         if model_method is None:

@@ -1847,6 +1847,7 @@ class BaseModelCardData(CardData):
         return super_dict
 
     def to_yaml(self, line_break=None) -> str:
+        # TODO: Don't rerun usage snippet generation and dataset example rendering just to convert to YAML
         return yaml_dump(
             {key: value for key, value in self.to_dict().items() if key in YAML_FIELDS and value not in (None, [])},
             sort_keys=False,
