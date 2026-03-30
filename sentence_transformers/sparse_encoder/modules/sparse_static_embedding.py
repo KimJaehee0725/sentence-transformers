@@ -14,6 +14,7 @@ import torch
 from transformers import AutoTokenizer
 
 from sentence_transformers.base.modules.input_module import InputModule
+from sentence_transformers.util import load_file_path
 
 if TYPE_CHECKING:
     from transformers import PreTrainedTokenizer
@@ -126,21 +127,18 @@ class SparseStaticEmbedding(InputModule):
         Returns:
             SparseStaticEmbedding: An initialized SparseStaticEmbedding model.
         """
-        # TODO: Use utils instead of "manually" downloading from hub
         if not os.path.exists(json_path):
-            try:
-                from huggingface_hub import hf_hub_download
-
-                json_path = hf_hub_download(
-                    repo_id=json_path,
-                    filename="idf.json",
-                    token=token,
-                    cache_dir=cache_folder,
-                    revision=revision,
-                    local_files_only=local_files_only,
-                )
-            except ValueError:
+            resolved_path = load_file_path(
+                json_path,
+                "idf.json",
+                token=token,
+                cache_folder=cache_folder,
+                revision=revision,
+                local_files_only=local_files_only,
+            )
+            if resolved_path is None:
                 raise ValueError(f"IDF JSON file not found at {json_path}. Please provide a valid path.")
+            json_path = resolved_path
 
         with open(json_path) as fIn:
             idf = json.load(fIn)
