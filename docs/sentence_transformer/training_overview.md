@@ -303,7 +303,7 @@ For example, a dataset for document screenshot retrieval might have a text ``"qu
     """
     Dataset({
         features: ['query', 'image', 'negative_0', 'negative_1', 'negative_2', 'negative_3'],
-        num_rows: 7972
+        num_rows: 10000
     })
     """
 
@@ -342,7 +342,7 @@ Most loss functions can be initialized with just the :class:`~sentence_transform
     train_dataset = load_dataset("sentence-transformers/all-nli", "pair-score", split="train")
     """
     Dataset({
-        features: ['sentence1', 'sentence2', 'label'],
+        features: ['sentence1', 'sentence2', 'score'],
         num_rows: 942069
     })
     """
@@ -513,7 +513,7 @@ Sometimes you don't have the required evaluation data to prepare one of these ev
             anchors=eval_dataset["anchor"],
             positives=eval_dataset["positive"],
             negatives=eval_dataset["negative"],
-            main_distance_function=SimilarityFunction.COSINE,
+            main_similarity_function=SimilarityFunction.COSINE,
             name="all-nli-dev",
         )
         # You can run evaluation like so:

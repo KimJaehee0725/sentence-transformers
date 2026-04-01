@@ -56,11 +56,11 @@ dataset = load_dataset("tomaarsen/llamaindex-vdr-en-train-preprocessed", "train"
 """
 Dataset({
     features: ['query', 'image', 'negative_0', 'negative_1', 'negative_2', 'negative_3'],
-    num_rows: 7972
+    num_rows: 10000
 })
 """
 print(dataset[0]["query"])
-# "What was the revenue in 2023?"
+# "What are the new anthropological perspectives on development as discussed by Quarles Van Ufford and Giri in 2003?"
 
 print(dataset[0]["image"])
 # <PIL.Image.Image image mode=RGB size=...>
