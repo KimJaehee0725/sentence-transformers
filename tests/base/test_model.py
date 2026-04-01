@@ -663,10 +663,11 @@ def test_save_to_hub_organization_conflict_raises(
         splade_bert_tiny_model.save_to_hub("org1/model-name", organization="different-org")
 
 
-def test_tokenize_deprecation_warning(stsb_bert_tiny_model: SentenceTransformer) -> None:
-    """tokenize() should emit a FutureWarning directing to preprocess()."""
-    with pytest.warns(FutureWarning, match="tokenize.*deprecated.*preprocess"):
+def test_tokenize_deprecation_warning(stsb_bert_tiny_model: SentenceTransformer, caplog) -> None:
+    """tokenize() should emit a warning directing to preprocess()."""
+    with caplog.at_level(logging.WARNING, logger="sentence_transformers.base.model"):
         result = stsb_bert_tiny_model.tokenize(["Hello world"])
+    assert "tokenize" in caplog.text and "deprecated" in caplog.text and "preprocess" in caplog.text
     assert isinstance(result, (dict, UserDict))
 
 
