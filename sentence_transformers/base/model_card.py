@@ -791,11 +791,18 @@ class BaseModelCardData(CardData):
         # AudioDict: {"array": ..., "sampling_rate": ...}
         if isinstance(value, dict) and "array" in value and "sampling_rate" in value:
             try:
-                import soundfile as sf
+                from torchcodec.encoders import AudioEncoder
 
+                array = value["array"]
+                if not isinstance(array, torch.Tensor):
+                    array = torch.as_tensor(array)
+                if array.ndim == 1:
+                    array = array.unsqueeze(0)  # (1, num_samples) for AudioEncoder
                 filename = f"{prefix}audio_{idx}.wav"
                 rel_path = f"assets/{filename}"
-                sf.write(os.path.join(assets_dir, filename), value["array"], value["sampling_rate"])
+                AudioEncoder(array.float(), sample_rate=value["sampling_rate"]).to_file(
+                    os.path.join(assets_dir, filename)
+                )
                 if content_hash is not None:
                     self._asset_cache[content_hash] = rel_path
                 return rel_path

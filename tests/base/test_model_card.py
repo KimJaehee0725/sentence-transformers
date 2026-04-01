@@ -278,9 +278,9 @@ class TestSavePredictExampleAssets:
     def test_audio_dict_saved_as_wav(self) -> None:
         """AudioDict saved to assets/ as .wav file."""
         try:
-            import soundfile  # noqa: F401
+            from torchcodec.encoders import AudioEncoder  # noqa: F401
         except ImportError:
-            pytest.skip("soundfile not installed")
+            pytest.skip("torchcodec not installed")
 
         data = _make_model_card_data()
         audio = {"array": np.random.randn(16000).astype(np.float32), "sampling_rate": 16000}

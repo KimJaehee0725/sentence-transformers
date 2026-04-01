@@ -25,9 +25,9 @@ except ImportError:
     VideoDecoder = None
 
 try:
-    import soundfile as sf
+    from torchcodec.encoders import AudioEncoder
 except ImportError:
-    sf = None
+    AudioEncoder = None
 
 if is_ci():
     pytest.skip(
@@ -281,15 +281,16 @@ def get_sample_audio(n: int = 2) -> dict[str, list[Any]]:
 
     # Generate local file paths
     paths = []
-    if sf is not None:
+    if AudioEncoder is not None:
         for i, arr in enumerate(arrays):
             temp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-            sf.write(temp_file.name, arr, sampling_rate)
             temp_file.close()
+            tensor = torch.from_numpy(arr).unsqueeze(0).float()  # (1, num_samples) for AudioEncoder
+            AudioEncoder(tensor, sample_rate=sampling_rate).to_file(temp_file.name)
             paths.append(temp_file.name)
             _temp_media_files.append(temp_file.name)
     else:
-        # Fallback if soundfile not available
+        # Fallback if torchcodec not available
         paths = urls[:n]
 
     result = {
@@ -300,7 +301,7 @@ def get_sample_audio(n: int = 2) -> dict[str, list[Any]]:
         # "path": paths,  # Rarely supported currently
     }
 
-    if AudioDecoder is not None and sf is not None:
+    if AudioDecoder is not None and AudioEncoder is not None:
         result["audio_decoder"] = [AudioDecoder(path) for path in paths]
 
     return result
