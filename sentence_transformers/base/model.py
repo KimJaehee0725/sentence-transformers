@@ -3,13 +3,11 @@ from __future__ import annotations
 import importlib
 import inspect
 import json
-import logging
 import os
 import shutil
 import sys
 import tempfile
 import traceback
-import warnings
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from multiprocessing import Queue
@@ -25,6 +23,7 @@ from packaging import version
 from torch import Tensor, nn
 from transformers import PreTrainedModel, is_datasets_available, is_torch_npu_available
 from transformers.dynamic_module_utils import get_class_from_dynamic_module, get_relative_import_files
+from transformers.utils import logging as transformers_logging
 
 from sentence_transformers import __version__
 from sentence_transformers.base.evaluation import BaseEvaluator
@@ -42,7 +41,7 @@ from sentence_transformers.util import (
 )
 from sentence_transformers.util.misc import ORIGINAL_TRANSFORMER_MODELS
 
-logger = logging.getLogger(__name__)
+logger = transformers_logging.get_logger(__name__)
 
 
 class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
@@ -547,15 +546,10 @@ class BaseModel(nn.Sequential, PeftAdapterMixin, ABC):
     def tokenize(self, texts: list[str] | list[dict] | list[tuple[str, str]], **kwargs) -> dict[str, Tensor]:
         """
         .. deprecated::
-            `tokenize` is deprecated and will be removed in a future version. Use `preprocess` instead.
+            `tokenize` is deprecated. Use `preprocess` instead.
         """
 
-        warnings.warn(
-            "The `tokenize` method is deprecated and will be removed in a future version. "
-            "Please use `preprocess` instead.",
-            FutureWarning,
-            stacklevel=2,
-        )
+        logger.warning_once("The `tokenize` method is deprecated, please use `preprocess` instead.")
         return self.preprocess(inputs=texts, **kwargs)
 
     def is_singular_input(self, inputs: Any) -> bool:

@@ -5,9 +5,13 @@ from typing import Any
 import torch
 from tokenizers import Tokenizer
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
+from transformers.utils import logging as transformers_logging
 
 from sentence_transformers.base.modality_types import Modality, PairInput, SingleInput
 from sentence_transformers.base.modules.module import Module
+
+# NOTE: transformers wraps the regular logging module for e.g. warning_once
+logger = transformers_logging.get_logger(__name__)
 
 
 class InputModule(Module):
@@ -28,7 +32,7 @@ class InputModule(Module):
 
     Additionally, subclasses should override:
 
-    - :meth:`sentence_transformers.base.modules.InputModule.preprocess`: Preprocess the inputs and return a dictionary of preprocessed features. A default implementation is provided that delegates to ``tokenize()``.
+    - :meth:`sentence_transformers.base.modules.InputModule.preprocess`: Preprocess the inputs and return a dictionary of preprocessed features.
 
     Optionally, you may also have to override:
 
@@ -88,16 +92,25 @@ class InputModule(Module):
 
         Returns:
             dict[str, torch.Tensor | Any]: Dictionary containing preprocessed features, e.g.
-                ``{"input_ids": ..., "attention_mask": ...}``
+                ``{"input_ids": ..., "attention_mask": ...}``, depending on what keys the module's forward method expects.
         """
-        # TODO: Neatly tackle this mutual infinite recursion between preprocess() and tokenize() due to the deprecation
-        # Should be overridden by subclasses, and otherwise just default to 'tokenize'
-        return self.tokenize(inputs, **kwargs)
+        # Backward compatibility: if a subclass overrides tokenize() but not preprocess(),
+        # delegate to the overridden tokenize(). We check the MRO to avoid calling the base
+        # tokenize() which delegates back to preprocess(), causing infinite mutual recursion.
+        if type(self).tokenize is not InputModule.tokenize:
+            logger.warning_once(
+                f"{type(self).__name__} overrides `tokenize` instead of `preprocess`. "
+                "`tokenize` is deprecated, please override `preprocess` instead.",
+            )
+            if prompt:
+                inputs = self._prepend_prompt(inputs, prompt)
+            return self.tokenize(inputs, **kwargs)
+        raise NotImplementedError(f"{type(self).__name__} must implement the `preprocess` method.")
 
     def tokenize(self, texts: list[str], **kwargs) -> dict[str, torch.Tensor | Any]:
         """
         .. deprecated::
-            `tokenize` is deprecated and will be removed in a future version. Use `preprocess` instead.
+            `tokenize` is deprecated. Use `preprocess` instead.
 
         Tokenizes the input texts and returns a dictionary of tokenized features.
 
@@ -109,13 +122,8 @@ class InputModule(Module):
             dict[str, torch.Tensor | Any]: Dictionary containing tokenized features, e.g.
                 ``{"input_ids": ..., "attention_mask": ...}``
         """
-        import warnings
-
-        warnings.warn(
-            "The `tokenize` method is deprecated and will be removed in a future version. "
-            "Please use `preprocess` instead.",
-            FutureWarning,
-            stacklevel=2,
+        logger.warning_once(
+            "The `tokenize` method is deprecated, please use `preprocess` instead.",
         )
         return self.preprocess(texts, **kwargs)
 
