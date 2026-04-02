@@ -819,9 +819,12 @@ class CrossEncoder(BaseModel, FitMixin):
         """
         list_types = (list, tuple)
         if is_datasets_available():
-            from datasets import Column
+            try:
+                from datasets import Column
 
-            list_types += (Column,)
+                list_types += (Column,)
+            except ImportError:
+                pass
         return (not isinstance(inputs, list_types)) or (len(inputs) > 0 and not isinstance(inputs[0], list_types))
 
     def _get_model_config(self) -> dict[str, Any]:
