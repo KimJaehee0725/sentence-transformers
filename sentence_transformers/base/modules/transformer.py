@@ -110,7 +110,10 @@ if TYPE_CHECKING and is_peft_available():
 
 logger = transformers_logging.get_logger(__name__)
 
-_TRANSFORMERS_SUPPORTS_PROCESSOR_KWARGS = parse_version(transformers_version) >= parse_version("5.4.0.dev0")
+_TRANSFORMERS_PROCESSOR_SUPPORTS_MODALITY_KWARGS = parse_version(transformers_version) > parse_version("4.56.1")
+_TRANSFORMERS_APPLY_CHAT_TEMPLATE_RECOMMENDS_PROCESSOR_KWARGS = parse_version(transformers_version) >= parse_version(
+    "5.4.0.dev0"
+)
 
 TransformerTask = Literal[
     "feature-extraction", "sequence-classification", "text-generation", "any-to-any", "fill-mask"
@@ -1152,7 +1155,10 @@ class Transformer(InputModule):
             }
 
             # Some transformers processors are still outdated, and don't accept common_kwargs, etc.
-            if self.config.model_type in {"clipseg", "whisper", "sam3"}:
+            if (
+                self.config.model_type in {"clipseg", "whisper", "sam3"}
+                or not _TRANSFORMERS_PROCESSOR_SUPPORTS_MODALITY_KWARGS
+            ):
                 # Check against the only valid multimodal modality for these architectures
                 if modality == ("audio", "text"):
                     # Audio must have priority for whisper, to correctly set padding to max_length
@@ -1216,7 +1222,7 @@ class Transformer(InputModule):
         if isinstance(self.processor, ProcessorMixin):
             # Transformers v5.4.0 prefers us to pass processor_kwargs as a single dict, but there's still some top level
             # kwargs that need to be hoisted out for backwards compatibility.
-            if _TRANSFORMERS_SUPPORTS_PROCESSOR_KWARGS:
+            if _TRANSFORMERS_APPLY_CHAT_TEMPLATE_RECOMMENDS_PROCESSOR_KWARGS:
                 return self.processor.apply_chat_template(
                     messages,
                     tokenize=True,
