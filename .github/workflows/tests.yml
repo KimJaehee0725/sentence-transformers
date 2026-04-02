@@ -61,6 +61,7 @@ jobs:
       # kenlm doesn't compile on Python 3.13, and pyctcdecode pins numpy<2.0.0
       # which conflicts with the rest of the stack. Exclude both on Python 3.13.
       - name: Create excludes file for packages without Python 3.13 support
+        shell: bash
         run: |
           if [ "${{ matrix.python-version }}" = "3.13" ]; then
             echo -e "kenlm\npyctcdecode" > excludes.txt
