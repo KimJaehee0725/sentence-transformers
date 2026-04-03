@@ -612,6 +612,11 @@ class CrossEncoder(BaseModel, FitMixin):
                 scores = model.predict(sentences, pool=pool)
                 model.stop_multi_process_pool(pool)
         """
+        if show_progress_bar is None:
+            show_progress_bar = (
+                logger.getEffectiveLevel() == logging.INFO or logger.getEffectiveLevel() == logging.DEBUG
+            )
+
         if batch_size <= 0:
             raise ValueError(f"batch_size must be a positive integer, got {batch_size}.")
 
@@ -646,11 +651,6 @@ class CrossEncoder(BaseModel, FitMixin):
             if is_singular_input:
                 pred_scores = pred_scores[0]
             return pred_scores
-
-        if show_progress_bar is None:
-            show_progress_bar = (
-                logger.getEffectiveLevel() == logging.INFO or logger.getEffectiveLevel() == logging.DEBUG
-            )
 
         prompt = self._resolve_prompt(prompt, prompt_name)
 

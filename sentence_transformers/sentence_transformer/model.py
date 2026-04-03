@@ -560,7 +560,6 @@ class SentenceTransformer(BaseModel, FitMixin):
                 ht.hpu.wrap_in_hpu_graph(self, disable_tensor_cache=True)
                 self.is_hpu_graph_enabled = True
 
-        self.eval()
         if show_progress_bar is None:
             show_progress_bar = logger.getEffectiveLevel() in (logging.INFO, logging.DEBUG)
 
@@ -630,6 +629,7 @@ class SentenceTransformer(BaseModel, FitMixin):
         if device is None:
             device = self.device
         self.to(device)
+        self.eval()
 
         truncate_dim = truncate_dim if truncate_dim is not None else self.truncate_dim
         all_embeddings = []
