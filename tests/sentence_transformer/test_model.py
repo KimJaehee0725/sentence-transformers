@@ -1311,3 +1311,37 @@ def test_router_transformers_model_property(
     from transformers import BertModel
 
     assert isinstance(model.transformers_model, BertModel)
+
+
+@pytest.mark.parametrize(
+    ("model_name", "expected_pooling_mode"),
+    [
+        ("hf-internal-testing/tiny-random-LlamaForCausalLM", "lasttoken"),
+        ("hf-internal-testing/tiny-random-BertLMHeadModel", "mean"),
+    ],
+    ids=["causal_lm", "encoder"],
+)
+def test_default_pooling_mode(model_name: str, expected_pooling_mode: str) -> None:
+    """CausalLM models should default to last-token pooling, while encoder models default to mean pooling."""
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+        model = SentenceTransformer(model_name, cache_folder=tmp_dir)
+        pooling_module = model[1]
+        assert isinstance(pooling_module, Pooling)
+        assert pooling_module.pooling_mode == expected_pooling_mode
+
+
+def test_default_pooling_mode_causal_lm_with_is_causal_false(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A CausalLM model with is_causal=False should default to mean pooling."""
+    original_init = Transformer.__init__
+
+    def patched_init(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        self.config.is_causal = False
+
+    monkeypatch.setattr(Transformer, "__init__", patched_init)
+
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+        model = SentenceTransformer("hf-internal-testing/tiny-random-LlamaForCausalLM", cache_folder=tmp_dir)
+        pooling_module = model[1]
+        assert isinstance(pooling_module, Pooling)
+        assert pooling_module.pooling_mode == "mean"
