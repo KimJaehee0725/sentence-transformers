@@ -5,6 +5,7 @@ import logging
 import os
 import random
 import re
+import time
 from collections import Counter, UserDict, defaultdict
 from copy import copy
 from dataclasses import dataclass, field, fields
@@ -155,6 +156,7 @@ class BaseModelCardCallback(TrainerCallback):
             for key, value in args_dict.items()
             if key not in ignore_keys and key in self.default_args_dict and value != self.default_args_dict[key]
         }
+        model.model_card_data._training_start_time = time.time()
 
     def on_evaluate(
         self,
@@ -172,6 +174,9 @@ class BaseModelCardCallback(TrainerCallback):
         }
         if len(loss_dict) == 1 and "loss" in loss_dict:
             loss_dict = {"Validation Loss": loss_dict["loss"]}
+        if "eval_runtime" in metrics:
+            model.model_card_data.evaluation_duration += metrics["eval_runtime"]
+
         if (
             model.model_card_data.training_logs
             and model.model_card_data.training_logs[-1]["Step"] == state.global_step
@@ -233,6 +238,8 @@ IGNORED_FIELDS = [
     "usage_examples_display",
     "_asset_cache",
     "_cached_dict",
+    "_training_start_time",
+    "evaluation_duration",
 ]
 
 
@@ -256,6 +263,20 @@ def get_versions() -> dict[str, Any]:
     versions["tokenizers"] = tokenizers_version
 
     return versions
+
+
+def format_duration(seconds: float) -> str:
+    """Format a duration in seconds to a human-readable string, e.g. "23 minutes" or "1.6 hours"."""
+    if seconds < 60:
+        return f"{seconds:.1f} seconds"
+    minutes = seconds / 60
+    if minutes < 60:
+        return f"{minutes:.1f} minutes"
+    hours = seconds / 3600
+    if hours < 24:
+        return f"{hours:.1f} hours"
+    days = seconds / 86400
+    return f"{days:.1f} days"
 
 
 def format_log(value: float | int | str) -> Any:
@@ -342,6 +363,8 @@ class BaseModelCardData(CardData):
     usage_examples_display: list | None = field(default=None, init=False, repr=False)
     label_example_list: list[dict[str, str]] = field(default_factory=list, init=False)
     code_carbon_callback: CodeCarbonCallback | None = field(default=None, init=False)
+    _training_start_time: float | None = field(default=None, init=False)
+    evaluation_duration: float = field(default=0.0, init=False)
     citations: dict[str, str] = field(default_factory=dict, init=False)
     best_model_step: int | None = field(default=None, init=False)
     ir_model: bool | None = field(default=None, init=False, repr=False)
@@ -1737,26 +1760,32 @@ class BaseModelCardData(CardData):
                 pass
         return "?"
 
-    def get_codecarbon_data(self) -> dict[Literal["co2_eq_emissions"], dict[str, Any]]:
+    def get_codecarbon_data(self) -> dict[str, Any]:
         emissions_data = self.code_carbon_callback.tracker._prepare_emissions_data()
-        # TODO: Can we alternatively also get hours_used from the training logs? And also Training Time without Evaluation?
-        # Or perhaps just Training Time (no evaluation) + Evaluation Time?
-        results = {
-            "co2_eq_emissions": {
-                # * 1000 to convert kg to g
-                "emissions": float(emissions_data.emissions) * 1000,
-                "energy_consumed": float(emissions_data.energy_consumed),
-                "source": "codecarbon",
-                "training_type": "fine-tuning",
-                "on_cloud": emissions_data.on_cloud == "Y",
-                "cpu_model": emissions_data.cpu_model,
-                "ram_total_size": emissions_data.ram_total_size,
-                "hours_used": round(emissions_data.duration / 3600, 3),
-            }
+        co2_eq_emissions: dict[str, Any] = {
+            # * 1000 to convert kg to g
+            "emissions": float(emissions_data.emissions) * 1000,
+            "energy_consumed": float(emissions_data.energy_consumed),
+            "source": "codecarbon",
+            "training_type": "fine-tuning",
+            "on_cloud": emissions_data.on_cloud == "Y",
+            "cpu_model": emissions_data.cpu_model,
+            "ram_total_size": emissions_data.ram_total_size,
         }
         if emissions_data.gpu_model:
-            results["co2_eq_emissions"]["hardware_used"] = emissions_data.gpu_model
-        return results
+            co2_eq_emissions["hardware_used"] = emissions_data.gpu_model
+        return {"co2_eq_emissions": co2_eq_emissions}
+
+    def get_training_duration_data(self) -> dict[str, str | None]:
+        if self._training_start_time is None:
+            return {"training_time": None, "evaluation_time": None, "total_time": None}
+        total_duration = time.time() - self._training_start_time
+        training_duration = total_duration - self.evaluation_duration
+        return {
+            "training_time": format_duration(training_duration),
+            "evaluation_time": format_duration(self.evaluation_duration) if self.evaluation_duration else None,
+            "total_time": format_duration(total_duration) if self.evaluation_duration else None,
+        }
 
     def get_model_specific_metadata(self) -> dict[str, Any]:
         if self.model is None:
@@ -1851,6 +1880,8 @@ class BaseModelCardData(CardData):
             and self.code_carbon_callback.tracker._start_time is not None
         ):
             super_dict.update(self.get_codecarbon_data())
+
+        super_dict.update(self.get_training_duration_data())
 
         # Add some additional metadata stored in the model itself
         super_dict.update(self.get_model_specific_metadata())
