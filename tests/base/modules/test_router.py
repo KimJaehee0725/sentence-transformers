@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging
 import os
 import re
 from copy import deepcopy
@@ -391,7 +392,9 @@ def test_router_save_load_without_default_route(static_embedding_model: StaticEm
         loaded_model.encode(["Test text"])
 
 
-def test_router_save_load_with_multiple_modules_per_route(static_embedding_model: StaticEmbedding, tmp_path: Path):
+def test_router_save_load_with_multiple_modules_per_route(
+    static_embedding_model: StaticEmbedding, tmp_path: Path, caplog
+):
     """Test saving and loading a model with multiple modules per route."""
     # Create two different mock modules for testing
     static_embedding_model_one = deepcopy(static_embedding_model)
@@ -418,8 +421,11 @@ def test_router_save_load_with_multiple_modules_per_route(static_embedding_model
     assert len(loaded_router.sub_modules["document"]) == 2
 
     # The first route has priority here, but usually all routes have the same embedding dimension
-    # as they can't be compared otherwise
-    assert loaded_model.get_embedding_dimension() == 128
+    # as they can't be compared otherwise. A warning should be emitted about the mismatch.
+    with caplog.at_level(logging.WARNING):
+        assert loaded_model.get_embedding_dimension() == 128
+    assert any("Different embedding dimensions" in record.message for record in caplog.records)
+    caplog.clear()
 
     # If we swap the order of the routes, the new first route should be used
     loaded_router.sub_modules = nn.ModuleDict(

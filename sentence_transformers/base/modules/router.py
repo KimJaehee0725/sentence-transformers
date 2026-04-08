@@ -513,7 +513,7 @@ class Router(InputModule):
         return ", ".join(parts)
 
     def get_embedding_dimension(self) -> int | None:
-        dims = set()
+        dims = []
         for sub_modules in self.sub_modules.values():
             for module in reversed(sub_modules):
                 # Fallback names for third-party modules that only define a deprecated name
@@ -523,19 +523,18 @@ class Router(InputModule):
                     "get_word_embedding_dimension",
                 ):
                     if hasattr(module, name):
-                        dims.add(getattr(module, name)())
+                        dims.append(getattr(module, name)())
                         break
                 else:
                     continue
                 break
         if not dims:
             return None
-        if len(dims) > 1:
+        if len(set(dims)) > 1:
             logger.warning_once(
-                f"Different embedding dimensions detected across routes: {dims}. Using the maximum value."
+                f"Different embedding dimensions detected across routes: {set(dims)}. Using the first value."
             )
-            return max(dims)
-        return dims.pop()
+        return dims[0]
 
     def save(self, output_path: str, safe_serialization: bool = True, **kwargs):
         model_lookup = {}
