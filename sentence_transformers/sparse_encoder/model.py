@@ -953,10 +953,16 @@ class SparseEncoder(BaseModel):
         )
         modules = list(modules.values())
         # Use the output dimension of the last module as the SAE input dimension
+        output_dim = None
         for module in reversed(modules):
             if hasattr(module, "get_embedding_dimension"):
                 output_dim = module.get_embedding_dimension()
                 break
+        if output_dim is None:
+            raise ValueError(
+                "Cannot determine the embedding dimension from the loaded modules. "
+                "At least one module must have a `get_embedding_dimension` method."
+            )
         sae = SparseAutoEncoder(
             input_dim=output_dim,
             hidden_dim=4 * output_dim,
