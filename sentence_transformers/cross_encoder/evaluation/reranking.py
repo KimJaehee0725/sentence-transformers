@@ -209,8 +209,7 @@ class CrossEncoderRerankingEvaluator(BaseEvaluator):
                 sample_metadata.append(None)
                 continue
 
-            num_ignored_positives = len(is_relevant) - len(docs)
-            sample_metadata.append((is_relevant, len(docs), num_ignored_positives))
+            sample_metadata.append((is_relevant, len(docs)))
             all_pairs.extend([query, doc] for doc in docs)
 
         # Single batched predict call for all query-document pairs
@@ -238,12 +237,9 @@ class CrossEncoderRerankingEvaluator(BaseEvaluator):
                 all_ap_scores.append(0)
                 continue
 
-            is_relevant, num_pairs, num_ignored_positives = meta
+            is_relevant, num_pairs = meta
             pred_scores = all_pred_scores[score_offset : score_offset + num_pairs]
             score_offset += num_pairs
-
-            if num_ignored_positives:
-                pred_scores = np.concatenate([pred_scores, np.zeros(num_ignored_positives)])
 
             mrr, ndcg, ap = self.compute_metrics(is_relevant, pred_scores)
             all_mrr_scores.append(mrr)
