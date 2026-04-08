@@ -43,7 +43,7 @@ class BaseEvaluator:
             Either a score for the evaluation with a higher score indicating a better result, or a dictionary with
             scores. If the latter is chosen, then `evaluator.primary_metric` must be defined
         """
-        pass
+        raise NotImplementedError
 
     def prefix_name_to_metrics(self, metrics: dict[str, float], name: str) -> dict[str, float]:
         def maybe_to_float(value: Any) -> Any:

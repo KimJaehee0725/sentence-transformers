@@ -321,8 +321,13 @@ class Router(InputModule):
     @property
     def modalities(self) -> list[Modality]:
         """The union of modalities supported by all sub-module input modules."""
-        return list(
-            {modality for route in self.sub_modules.values() for modality in getattr(route[0], "modalities", ["text"])}
+        return sorted(
+            {
+                modality
+                for route in self.sub_modules.values()
+                for modality in getattr(route[0], "modalities", ["text"])
+            },
+            key=str,
         )
 
     def _get_routes_string(self):
@@ -507,7 +512,7 @@ class Router(InputModule):
             parts.append(f"route_mappings={self.route_mappings}")
         return ", ".join(parts)
 
-    def get_embedding_dimension(self) -> int:
+    def get_embedding_dimension(self) -> int | None:
         dims = set()
         for sub_modules in self.sub_modules.values():
             for module in reversed(sub_modules):
