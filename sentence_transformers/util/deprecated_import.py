@@ -53,6 +53,7 @@ DEPRECATED_MODULE_PATHS = {
     "sentence_transformers.losses.CachedMultipleNegativesRankingLoss": "sentence_transformers.sentence_transformer.losses.cached_multiple_negatives_ranking",
     "sentence_transformers.losses.CachedMultipleNegativesSymmetricRankingLoss": "sentence_transformers.sentence_transformer.losses.cached_multiple_negatives_symmetric_ranking",
     "sentence_transformers.losses.CoSENTLoss": "sentence_transformers.sentence_transformer.losses.cosent",
+    "sentence_transformers.losses.ContrastiveAccumulationLoss": "sentence_transformers.sentence_transformer.losses.contrastive_accumulation",
     "sentence_transformers.losses.ContrastiveLoss": "sentence_transformers.sentence_transformer.losses.contrastive",
     "sentence_transformers.losses.ContrastiveTensionLoss": "sentence_transformers.sentence_transformer.losses.contrastive_tension",
     "sentence_transformers.losses.CosineSimilarityLoss": "sentence_transformers.sentence_transformer.losses.cosine_similarity",

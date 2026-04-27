@@ -10,6 +10,7 @@ from .batch_hard_soft_margin_triplet import BatchHardSoftMarginTripletLoss
 from .batch_hard_triplet import BatchHardTripletLoss, BatchHardTripletLossDistanceFunction
 from .batch_semi_hard_triplet import BatchSemiHardTripletLoss
 from .cached_gist_embed import CachedGISTEmbedLoss
+from .contrastive_accumulation import ContrastiveAccumulationLoss
 from .cached_multiple_negatives_ranking import CachedMultipleNegativesRankingLoss
 from .cached_multiple_negatives_symmetric_ranking import CachedMultipleNegativesSymmetricRankingLoss
 from .contrastive import ContrastiveLoss, SiameseDistanceMetric
@@ -49,6 +50,7 @@ __all__ = [
     "ContrastiveLoss",
     "SiameseDistanceMetric",
     "CachedGISTEmbedLoss",
+    "ContrastiveAccumulationLoss",
     "CachedMultipleNegativesRankingLoss",
     "CachedMultipleNegativesSymmetricRankingLoss",
     "ContrastiveTensionLoss",
